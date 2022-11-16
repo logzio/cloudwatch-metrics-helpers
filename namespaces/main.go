@@ -37,9 +37,16 @@ func HandleRequest(ctx context.Context, event cfn.Event) (string, error) {
 	if event.RequestID != "" && event.RequestType == cfn.RequestCreate {
 		// Custom resource CREATE invocation
 		lambda.Start(cfn.LambdaWrap(customResourceRun))
+	} else {
+		lambda.Start(cfn.LambdaWrap(customResourceDoNothing))
 	}
 
 	return "Lambda finished", nil
+}
+
+// Wrapper for Read, Update, Delete requests
+func customResourceDoNothing(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
+	return
 }
 
 // Wrapper for first invocation from cloud formation custom resource
