@@ -1,0 +1,179 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: "Send Cloudwatch metrics from your CloudWatch to Logz.io"
+Parameters:
+  logzioDestination:
+    Type: String
+    Description: 'Your Logz.io destination'
+    Default: 'https://listener-aws-metrics-stream-us.logz.io/'
+    AllowedValues:
+      - 'https://listener-aws-metrics-stream-us.logz.io/'
+      - 'https://listener-aws-metrics-srteam-eu.logz.io/'
+  logzioToken:
+    Type: String
+    Description: 'Your Logz.io log shipping token'
+    MinLength: 1
+  awsNamespaces:
+    Type: String
+    Description: 'The AWS namespaces you want to collect metrics from'
+    MinLength: 1
+
+Resources:
+  logzioS3BackupBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ['-', ['logzio-metric-stream-backup', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+  logzioS3DestinationFirehoseRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join ['-', ['LogzioS3DestFirehoseRole', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - firehose.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Join ['-', ['LogzioS3DestFirehosePolicy', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:AbortMultipartUpload'
+                  - 's3:GetBucketLocation'
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                  - 's3:ListBucketMultipartUploads'
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub
+                    - 'arn:aws:s3:::${BucketName}'
+                    - BucketName: !Ref logzioS3BackupBucket
+                  - !Sub
+                    - 'arn:aws:s3:::${BucketName}/*'
+                    - BucketName: !Ref logzioS3BackupBucket
+  logzioDeliveryStream:
+    DependsOn: logzioS3BackupBucket
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Join ['-', ['LogzioDeliveryStream', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+      DeliveryStreamType: DirectPut
+      HttpEndpointDestinationConfiguration:
+        BufferingHints:
+          IntervalInSeconds: 60 # TODO - allow configuration
+          SizeInMBs: 5 # TODO - allow configuration
+        EndpointConfiguration:
+          AccessKey: !Ref logzioToken
+          Name: !Join ['-', ['LogzioEndpoint', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+          Url: !Ref logzioDestination
+        RetryOptions:
+          DurationInSeconds: 60 # TODO - allow configuration
+        S3BackupMode: FailedDataOnly
+        S3Configuration:
+          BucketARN: !GetAtt logzioS3BackupBucket.Arn
+          RoleARN: !GetAtt logzioS3DestinationFirehoseRole.Arn
+  logzioMetricStreamRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join ['-', ['LogzioMetricStreamRole', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - streams.metrics.cloudwatch.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Join ['-', ['LogzioMetricStreamPolicy', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'firehose:PutRecord'
+                  - 'firehose:PutRecordBatch'
+                Resource:
+                  - !Sub
+                    - 'arn:${AWS::Partition}:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/${DeliveryStreamName}'
+                    - DeliveryStreamName: !Ref logzioDeliveryStream
+  logzioMetricStream:
+    Type: AWS::CloudWatch::MetricStream
+    DependsOn:
+      - logzioDeliveryStream
+      - logzioMetricStreamRole
+    Properties:
+      FirehoseArn: !GetAtt logzioDeliveryStream.Arn
+      Name: !Join ['-', ['LogzioMetricStream', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+      OutputFormat: 'opentelemetry0.7'
+      RoleArn: !GetAtt logzioMetricStreamRole.Arn
+      # IncludeFilters:
+      #   - Namespace: 'AWS/Lambda'
+  logzioMetricStreamAddNamespacesLambda:
+    Type: 'AWS::Lambda::Function'
+    DependsOn: logzioMetricStream
+    Properties:
+      Code:
+        S3Bucket: logzio-aws-integrations-us-east-1
+        S3Key: metric-stream-helpers/namespaces/1.0.0/function.zip
+      FunctionName:  !Join ['-', [!Ref AWS::StackName, 'namespaces-func']]
+      Handler: bootstrap
+      Runtime: provided.al2
+      Role: !GetAtt logzioNamespacesLambdaRole.Arn
+      Timeout: 60 # TODO - allow configuration
+      MemorySize: 512 # TODO - allow configuration
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          AWS_NAMESPACES: !Ref awsNamespaces
+          METRIC_STREAM_NAME: !Ref logzioMetricStream
+          FIREHOSE_ARN: !GetAtt logzioDeliveryStream.Arn
+          METRIC_STREAM_ROLE_ARN: !GetAtt logzioMetricStreamRole.Arn
+  logzioNamespacesPrimerInvoke:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: logzioMetricStreamAddNamespacesLambda
+    Version: '1.0'
+    Properties:
+      ServiceToken: !GetAtt logzioMetricStreamAddNamespacesLambda.Arn
+  logzioNamespacesLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join ['-', ['LogzioMetricStreamNamespacesLambdaRole', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Join ['-', ['LogzioMetricStreamNamespacesLambdaPolicy', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'cloudwatch:PutMetricStream'
+                Resource:
+                  - !GetAtt logzioMetricStream.Arn
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource:
+                  - !GetAtt logzioMetricStreamRole.Arn

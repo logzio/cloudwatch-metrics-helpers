@@ -24,23 +24,40 @@ const (
 	listSeparator = ","
 )
 
+var logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
+
 func main() {
 	lambda.Start(HandleRequest)
 }
 
 func HandleRequest(ctx context.Context, event cfn.Event) (string, error) {
-	log.Println("Starting triggers run")
+	logger.Println("Starting triggers run")
 
 	// If requestID is empty - the lambda call is not from a custom resource
 	if event.RequestID != "" && event.RequestType == cfn.RequestCreate {
 		// Custom resource CREATE invocation
-		lambda.Start(cfn.LambdaWrap(run))
+		lambda.Start(cfn.LambdaWrap(customResourceRun))
 	}
 
 	return "Lambda finished", nil
 }
 
-func run(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
+// Wrapper for first invocation from cloud formation custom resource
+func customResourceRun(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
+	if event.RequestType == cfn.RequestCreate {
+		err = run()
+		if err != nil {
+			logger.Printf("Encountered an error: %s", err.Error())
+			return
+		}
+	} else {
+		logger.Println("Got ", event.RequestType, " request")
+	}
+
+	return
+}
+
+func run() (err error) {
 	awsNs, err := getAwsNamespaces()
 	if err != nil {
 		return
@@ -59,9 +76,12 @@ func run(ctx context.Context, event cfn.Event) (physicalResourceID string, data 
 	filters := make([]*cloudwatch.MetricStreamFilter, 0)
 	for _, namespace := range awsNs {
 		filter := new(cloudwatch.MetricStreamFilter)
-		filter.Namespace = &namespace
+		filter.Namespace = new(string)
+		*filter.Namespace = namespace
 		filters = append(filters, filter)
 	}
+
+	log.Printf("Filters to add: %v", filters)
 
 	putFilterOutput, err := client.PutMetricStream(&cloudwatch.PutMetricStreamInput{
 		FirehoseArn:    &firehoseArn,
@@ -72,11 +92,11 @@ func run(ctx context.Context, event cfn.Event) (physicalResourceID string, data 
 	})
 
 	if err != nil {
-		log.Println(err.Error())
+		logger.Println(err.Error())
 		return
 	}
 
-	log.Println(putFilterOutput.String())
+	logger.Println(putFilterOutput.String())
 
 	return
 }
@@ -104,6 +124,6 @@ func getAwsNamespaces() ([]string, error) {
 	nsStr = strings.ReplaceAll(nsStr, " ", "")
 
 	ns := strings.Split(nsStr, listSeparator)
-	log.Printf("detected the following services: %v", ns)
+	logger.Printf("detected the following services: %v", ns)
 	return ns, nil
 }
