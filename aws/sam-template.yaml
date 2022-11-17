@@ -9,6 +9,9 @@ Parameters:
     AllowedValues:
       - 'https://listener-aws-metrics-stream-us.logz.io/'
       - 'https://listener-aws-metrics-srteam-eu.logz.io/'
+      - 'https://listener-aws-metrics-stream-au.logz.io/'
+      - 'https://listener-aws-metrics-stream-uk.logz.io/'
+      - 'https://listener-aws-metrics-stream-ca.logz.io/'
   logzioToken:
     Type: String
     Description: 'Your Logz.io log shipping token'
