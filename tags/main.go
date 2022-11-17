@@ -5,6 +5,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"log"
 	"os"
 	"strings"
@@ -25,9 +26,30 @@ func main() {
 }
 
 func HandleRequest() error {
-	services, sess, err := initialize()
+	services, client, err := initialize()
 	if err != nil {
 		return err
+	}
+
+	var nextToken *string
+	for {
+		getResourcesOutput, err := client.GetResources(&resourcegroupstaggingapi.GetResourcesInput{
+			PaginationToken:     nextToken,
+			ResourceTypeFilters: services,
+		})
+
+		if err != nil {
+			return fmt.Errorf("error occurred while trying to get resources: ", err.Error())
+		}
+
+		if getResourcesOutput != nil {
+			nextToken = getResourcesOutput.PaginationToken
+			sendTags(getResourcesOutput.ResourceTagMappingList)
+		}
+
+		if nextToken == nil {
+			break
+		}
 	}
 
 	return nil
@@ -60,18 +82,30 @@ func getSession() (*session.Session, error) {
 	return sess, nil
 }
 
-func initialize() ([]string, *session.Session, error) {
+func initialize() ([]*string, *resourcegroupstaggingapi.ResourceGroupsTaggingAPI, error) {
 	namespaces, err := getAwsNamespaces()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not retrieve namespaces: %s. Aborting", err.Error())
 	}
 
 	services := namespacesToServices(namespaces)
+	if len(services) == 0 {
+		return nil, nil, fmt.Errorf("could not translate any namespace to service. Aborting")
+	}
 
 	sess, err := getSession()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create AWS session: %s. Aborting", err.Error())
 	}
 
-	return services, sess, nil
+	tagsClient := resourcegroupstaggingapi.New(sess)
+	if tagsClient == nil {
+		return nil, nil, fmt.Errorf("could not initialize resource groups tags client. Aborting")
+	}
+
+	return services, tagsClient, nil
+}
+
+func sendTags(list []*resourcegroupstaggingapi.ResourceTagMapping) {
+
 }

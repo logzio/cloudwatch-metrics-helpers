@@ -1,12 +1,14 @@
 package main
 
-func namespacesToServices(namespaces []string) []string {
-	services := make([]string, 0)
+func namespacesToServices(namespaces []string) []*string {
+	services := make([]*string, 0)
 	ns2sMap := getServicesMap()
 	for _, ns := range namespaces {
 		if serviceArr, ok := ns2sMap[ns]; ok {
 			for _, service := range serviceArr {
-				services = append(services, service)
+				servicePtr := new(string)
+				*servicePtr = service
+				services = append(services, servicePtr)
 			}
 		} else {
 			logger.Println("namespace ", ns, " does not appear in service map. will not try to retrieve its tags")
