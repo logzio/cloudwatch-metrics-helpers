@@ -16,6 +16,16 @@ Parameters:
     Type: String
     Description: 'Your Logz.io log shipping token'
     MinLength: 1
+  logzioListener:
+    Type: String
+    Description: 'Your Logz.io listener'
+    Default: 'https://listener.logz.io:8053'
+    AllowedValues:
+      - 'https://listener.logz.io:8053'
+      - 'https://listener-au.logz.io:8053'
+      - 'https://listener-ca.logz.io:8053'
+      - 'https://listener-eu.logz.io:8053'
+      - 'https://listener-uk.logz.io:8053'
   awsNamespaces:
     Type: String
     Description: 'The AWS namespaces you want to collect metrics from'
@@ -186,3 +196,68 @@ Resources:
                   - 'iam:PassRole'
                 Resource:
                   - !GetAtt logzioMetricStreamRole.Arn
+  logzioMetricStreamAddTagsLambda:
+    Type: 'AWS::Lambda::Function'
+    DependsOn: logzioMetricStream
+    Properties:
+      Code:
+        S3Bucket: logzio-aws-integrations-us-east-1
+        S3Key: metric-stream-helpers/tags/1.0.0/function.zip
+      FunctionName: !Join [ '-', [ !Ref AWS::StackName, 'tags-func' ] ]
+      Handler: main
+      Runtime: go1.x
+      Role: !GetAtt logzioTagsLambdaRole.Arn
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          AWS_NAMESPACES: !Ref awsNamespaces
+          LOGZIO_METRICS_LISTENER: !Ref logzioListener
+          LOGZIO_METRICS_TOKEN: !Ref logzioToken
+  logzioTagsLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join [ '-', [ 'LogzioMetricStreamTagsLambdaRole', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Join [ '-', [ 'LogzioMetricStreamTagsLambdaPolicy', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'tag:GetResources'
+                Resource: '*'
+  logzioMetricStreamTagsLambdaTrigger:
+    DependsOn: logzioMetricStreamAddTagsLambda
+    Type: AWS::Events::Rule
+    Properties:
+      Description: 'This event is a cron job that triggeres every 1 min the Logz.io metric stream tags Lambda function.'
+      ScheduleExpression: rate(1 minute)
+      Name: !Join [ '-', [ 'LogzioMetricStreamTagsLambdaTrigger', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt logzioMetricStreamAddTagsLambda.Arn
+          Id: 'LogzioMetricStreamAddTagsLambda'
+  logzioMetricStreamTagsLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref logzioMetricStreamAddTagsLambda
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt logzioMetricStreamTagsLambdaTrigger.Arn
