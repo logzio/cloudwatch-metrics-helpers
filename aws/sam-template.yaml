@@ -247,8 +247,8 @@ Resources:
     DependsOn: logzioMetricStreamAddTagsLambda
     Type: AWS::Events::Rule
     Properties:
-      Description: 'This event is a cron job that triggeres every 1 min the Logz.io metric stream tags Lambda function.'
-      ScheduleExpression: rate(1 minute)
+      Description: 'This event is a cron job that triggeres every 5 minutes the Logz.io metric stream tags Lambda function.'
+      ScheduleExpression: rate(5 minutes)
       Name: !Join [ '-', [ 'LogzioMetricStreamTagsLambdaTrigger', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
       State: ENABLED
       Targets:
