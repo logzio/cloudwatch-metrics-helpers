@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/controller/basic"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -194,18 +195,87 @@ func sendTags(ctx context.Context, resources []*resourcegroupstaggingapi.Resourc
 			})
 		}
 
-		attributes = append(attributes, attribute.KeyValue{
-			Key:   "arn",
-			Value: attribute.StringValue(*resource.ResourceARN),
-		})
+		idLabels := addIdentifier(*resource.ResourceARN)
+		if idLabels == nil {
+			attributes = append(attributes, attribute.KeyValue{
+				Key:   "Arn",
+				Value: attribute.StringValue(*resource.ResourceARN),
+			})
+		} else {
+			attributes = append(attributes, idLabels...)
+		}
 
 		counter.Add(ctx, int64(1), attributes...)
 	}
 
 }
 
+func addIdentifier(resourceArn string) []attribute.KeyValue {
+	arnToId := getArnRegexToIdsMap()
+	for arn, _ := range arnToId {
+		matched, err := regexp.MatchString(arn, resourceArn)
+		if err != nil {
+			logger.Println("error while trying to match resource arn ", resourceArn, " with regex ", arn)
+			continue
+		}
+
+		if matched {
+			return getLabels(resourceArn, arn, arnToId)
+		}
+	}
+
+	return nil
+}
+
 func handleErr(err error) {
 	if err != nil {
 		logger.Println("encountered error: ", err)
 	}
+}
+
+func getLabels(resourceArn, matchedRegexArn string, arnToIds map[string][]string) []attribute.KeyValue {
+	switch matchedRegexArn {
+	case arnRegEc2:
+		// In this case we need to check if it's indeed EC2, or EBS
+		matched, err := regexp.MatchString(arnRegEbs, resourceArn)
+		if err != nil {
+		}
+		if err == nil && matched {
+			return getKeyValuePairs(arnToIds[arnRegEbs], resourceArn, true)
+		} else {
+			return getKeyValuePairs(arnToIds[arnRegEc2], resourceArn, true)
+		}
+	case arnRegAcm:
+	case arnRegAcmPca:
+	case arnRegStepFunction:
+		return getKeyValuePairs(arnToIds[matchedRegexArn], resourceArn, false)
+	default:
+		return getKeyValuePairs(arnToIds[matchedRegexArn], resourceArn, true)
+	}
+
+	return getKeyValuePairs(arnToIds[matchedRegexArn], resourceArn, true)
+}
+
+func getKeyValuePairs(keys []string, arn string, idOnly bool) []attribute.KeyValue {
+	value := arn
+	if idOnly {
+		arnArr := strings.Split(arn, ":")
+		value = arnArr[len(arnArr)-1]
+		if strings.Contains(value, "/") {
+			resourceArray := strings.Split(value, "/")
+			value = resourceArray[len(resourceArray)-1]
+		}
+	}
+
+	logger.Println("for resource ", arn, " the id is: ", value)
+
+	attributes := make([]attribute.KeyValue, 0)
+	for _, key := range keys {
+		attributes = append(attributes, attribute.KeyValue{
+			Key:   attribute.Key(key),
+			Value: attribute.StringValue(value),
+		})
+	}
+
+	return attributes
 }
