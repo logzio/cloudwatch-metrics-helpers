@@ -186,7 +186,6 @@ func sendTags(ctx context.Context, resources []*resourcegroupstaggingapi.Resourc
 			continue
 		}
 
-		logger.Println("handling resource ", *resource.ResourceARN)
 		attributes := make([]attribute.KeyValue, 0)
 		for _, tag := range resource.Tags {
 			attributes = append(attributes, attribute.KeyValue{
@@ -234,6 +233,7 @@ func handleErr(err error) {
 }
 
 func getLabels(resourceArn, matchedRegexArn string, arnToIds map[string][]string) []attribute.KeyValue {
+	// Special cases
 	switch matchedRegexArn {
 	case arnRegEc2:
 		// In this case we need to check if it's indeed EC2, or EBS
@@ -248,9 +248,8 @@ func getLabels(resourceArn, matchedRegexArn string, arnToIds map[string][]string
 	case arnRegAcm:
 	case arnRegAcmPca:
 	case arnRegStepFunction:
+		// Resources that their identifier is an entire ARN
 		return getKeyValuePairs(arnToIds[matchedRegexArn], resourceArn, false)
-	default:
-		return getKeyValuePairs(arnToIds[matchedRegexArn], resourceArn, true)
 	}
 
 	return getKeyValuePairs(arnToIds[matchedRegexArn], resourceArn, true)
@@ -272,7 +271,7 @@ func getKeyValuePairs(keys []string, arn string, idOnly bool) []attribute.KeyVal
 	attributes := make([]attribute.KeyValue, 0)
 	for _, key := range keys {
 		attributes = append(attributes, attribute.KeyValue{
-			Key:   attribute.Key(key),
+			Key:   attribute.Key(strings.ToLower(key)),
 			Value: attribute.StringValue(value),
 		})
 	}
