@@ -1,12 +1,11 @@
 # Cloudwatch Metric Stream
 
-Deploy this integration to send metrics from your CloudWatch to Logz.io.
+Deploy this integration to send your CloudWatch metrics to Logz.io.
 
 
 ## Overview
 
-This integration creates a Kinesis Data Firehose delivery stream that links to your CloudWatch metrics stream and then sends the metrics to your Logz.io account.
-It also creates a Lambda function that adds AWS namespaces to the metric stream, and a Lambda function that collects and ships the resources' tags.
+This integration creates a Kinesis Data Firehose delivery stream that links to your CloudWatch metrics stream and then sends the metrics to your Logz.io account. It also creates a Lambda function that adds AWS namespaces to the metric stream, and a Lambda function that collects and ships the resources' tags.
 
 ## Instructions
 
@@ -40,7 +39,7 @@ Specify the stack details as per the table below, check the checkboxes and selec
 |--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
 | `logzioListener`                           | The Logz.io listener URL for your region. (For more details, see the [regions page](https://docs.logz.io/user-guide/accounts/account-region.html). For example - `https://listener.logz.io:8053`     | **Required**     |
 | `logzioToken`                              | Your Logz.io metrics shipping token.                                                                                                                                                                 | **Required**     |
-| `awsNamespaces`                            | Comma delimited list of the AWS namespaces you want to monitor. See [this list]((https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/aws-services-cloudwatch-metrics.html) of namespaces. | **Required**     |
+| `awsNamespaces`                            | Comma-separated list of the AWS namespaces you want to monitor. See [this list]((https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/aws-services-cloudwatch-metrics.html) of namespaces. | **Required**     |
 | `logzioDestination`                        | Your Logz.io destination URL.                                                                                                                                                                        |
 | `httpEndpointDestinationIntervalInSeconds` | The length of time, in seconds, that Kinesis Data Firehose buffers incoming data before delivering it to the destination.                                                                            | `60`             |
 | `httpEndpointDestinationSizeInMBs`         | The size of the buffer, in MBs, that Kinesis Data Firehose uses for incoming data before delivering it to the destination.                                                                           | `5`              |
