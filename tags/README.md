@@ -1,6 +1,6 @@
 ### Logz.io Metric Stream Helper - Tags
 
-This Lambda collect tags from resources under selected AWS namespaces, and sends them as metrics to Logz.io.
+This Lambda collects tags from resources under selected AWS namespaces, and sends them as metrics to Logz.io.
 
 #### Environment variables:
 
