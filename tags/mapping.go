@@ -259,7 +259,7 @@ func getNamespacesToServicesMap() map[string][]string {
 		nsEc2:               {"ec2"},
 		nsAutoScaling:       {"autoscaling"},
 		nsElasticBeanstalk:  {"elasticbeanstalk"},
-		nsEbs:               {"ebs"},
+		nsEbs:               {"ec2:volume"},
 		nsEcs:               {"ecs"},
 		nsEfs:               {"elasticfilesystem"},
 		nsElasticInference:  {"elastic-inference"},
