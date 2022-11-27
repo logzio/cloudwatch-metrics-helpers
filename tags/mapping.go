@@ -166,6 +166,7 @@ const (
 	nsMl                       = "AWS/ML"
 	nsKafka                    = "AWS/Kafka"
 	nsMq                       = "AWS/AmazonMQ"
+	nsNeptune                  = "AWS/Neptune"
 	nsNetworkFirewall          = "AWS/NetworkFirewall"
 	nsNetworkManager           = "AWS/NetworkManager"
 	nsNimbleStudio             = "AWS/NimbleStudio"
@@ -483,6 +484,7 @@ func getAllNamespaces() []string {
 		nsMl,
 		nsKafka,
 		nsMq,
+		nsNeptune,
 		nsNetworkFirewall,
 		nsNetworkManager,
 		nsNimbleStudio,
