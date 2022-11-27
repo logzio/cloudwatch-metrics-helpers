@@ -51,5 +51,7 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 ## Changelog:
 
-- **1.1.0**: Support adding all namespaces by setting `awsNamespaces` with `all-namespaces`.
+- **1.1.0**:
+  - Support adding all namespaces by setting `awsNamespaces` with `all-namespaces`.
+  - Tags function: fix EBS service details.
 - **1.0.0**: Initial release.

@@ -58,7 +58,6 @@ const (
 	arnRegMl                   = "^arn\\:.+\\:machinelearning\\:.+$"
 	arnRegKafka                = "^arn\\:.+\\:kafka\\:.+$"
 	arnRegMq                   = "^arn\\:.+\\:mq\\:.+$"
-	arnRegNeptune              = "^arn\\:.+\\:neptune-db\\:.+$"
 	arnRegNetworkManager       = "^arn\\:.+\\:networkmanager\\:.+$"
 	arnRegOpsWorks             = "^arn\\:.+\\:opsworks\\:.+$"
 	arnRegQldb                 = "^arn\\:.+\\:qldb\\:.+$"
@@ -167,7 +166,6 @@ const (
 	nsMl                       = "AWS/ML"
 	nsKafka                    = "AWS/Kafka"
 	nsMq                       = "AWS/AmazonMQ"
-	nsNeptune                  = "AWS/Neptune"
 	nsNetworkFirewall          = "AWS/NetworkFirewall"
 	nsNetworkManager           = "AWS/NetworkManager"
 	nsNimbleStudio             = "AWS/NimbleStudio"
@@ -292,7 +290,6 @@ func getNamespacesToServicesMap() map[string][]string {
 		nsMl:                {"machinelearning"},
 		nsKafka:             {"kafka"},
 		nsMq:                {"mq"},
-		nsNeptune:           {"neptune-db"},
 		nsNetworkManager:    {"networkmanager"},
 		nsOpsWorks:          {"opsworks"},
 		nsQldb:              {"qldb"},
@@ -375,7 +372,6 @@ func getArnRegexToIdsMap() map[string][]string {
 		arnRegMl:                   {},
 		arnRegKafka:                {"Cluster Name"},
 		arnRegMq:                   {"Broker"},
-		arnRegNeptune:              {"DBClusterIdentifier"},
 		arnRegNetworkManager:       {"FirewallName"},
 		arnRegOpsWorks:             {"StackId"},
 		arnRegQldb:                 {"LedgerName"},
@@ -487,7 +483,6 @@ func getAllNamespaces() []string {
 		nsMl,
 		nsKafka,
 		nsMq,
-		nsNeptune,
 		nsNetworkFirewall,
 		nsNetworkManager,
 		nsNimbleStudio,
