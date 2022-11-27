@@ -131,6 +131,12 @@ func getAwsNamespaces() ([]string, error) {
 	nsStr = strings.ReplaceAll(nsStr, " ", "")
 
 	ns := strings.Split(nsStr, listSeparator)
+	for _, namespace := range ns {
+		if namespace == nsAll {
+			logger.Println("detected ALL namespaces")
+			return getAllNamespaces(), nil
+		}
+	}
 	logger.Printf("detected the following services: %v", ns)
 	return ns, nil
 }

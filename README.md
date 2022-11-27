@@ -35,14 +35,14 @@ To deploy this project, click the button that matches the region you wish to dep
 
 Specify the stack details as per the table below, check the checkboxes and select **Create stack**.
 
-| Parameter                                  | Description                                                                                                                                                                                          | Required/Default |
-|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `logzioListener`                           | The Logz.io listener URL for your region. (For more details, see the [regions page](https://docs.logz.io/user-guide/accounts/account-region.html). For example - `https://listener.logz.io:8053`     | **Required**     |
-| `logzioToken`                              | Your Logz.io metrics shipping token.                                                                                                                                                                 | **Required**     |
-| `awsNamespaces`                            | Comma-separated list of the AWS namespaces you want to monitor. See [this list]((https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/aws-services-cloudwatch-metrics.html) of namespaces. | **Required**     |
-| `logzioDestination`                        | Your Logz.io destination URL.                                                                                                                                                                        | **Required**     |
-| `httpEndpointDestinationIntervalInSeconds` | The length of time, in seconds, that Kinesis Data Firehose buffers incoming data before delivering it to the destination.                                                                            | `60`             |
-| `httpEndpointDestinationSizeInMBs`         | The size of the buffer, in MBs, that Kinesis Data Firehose uses for incoming data before delivering it to the destination.                                                                           | `5`              |
+| Parameter                                  | Description                                                                                                                                                                                                                                                                       | Required/Default |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+| `logzioListener`                           | The Logz.io listener URL for your region. (For more details, see the [regions page](https://docs.logz.io/user-guide/accounts/account-region.html). For example - `https://listener.logz.io:8053`                                                                                  | **Required**     |
+| `logzioToken`                              | Your Logz.io metrics shipping token.                                                                                                                                                                                                                                              | **Required**     |
+| `awsNamespaces`                            | Comma-separated list of the AWS namespaces you want to monitor. See [this list]((https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/aws-services-cloudwatch-metrics.html) of namespaces. If you want to automatically add all namespaces, use value `all-namespaces`. | **Required**     |
+| `logzioDestination`                        | Your Logz.io destination URL.                                                                                                                                                                                                                                                     | **Required**     |
+| `httpEndpointDestinationIntervalInSeconds` | The length of time, in seconds, that Kinesis Data Firehose buffers incoming data before delivering it to the destination.                                                                                                                                                         | `60`             |
+| `httpEndpointDestinationSizeInMBs`         | The size of the buffer, in MBs, that Kinesis Data Firehose uses for incoming data before delivering it to the destination.                                                                                                                                                        | `5`              |
 
 ### 2. Send your metrics
 
@@ -51,4 +51,5 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 ## Changelog:
 
+- **1.1.0**: Support adding all namespaces by setting `awsNamespaces` with `all-namespaces`.
 - **1.0.0**: Initial release.
