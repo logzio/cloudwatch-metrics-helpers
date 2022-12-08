@@ -1,0 +1,45 @@
+before:
+  hooks:
+builds:
+  - env:
+      - CGO_ENABLED=0
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}'
+    goos:
+      - linux
+    goarch:
+      - amd64
+    binary: 'bootstrap'
+    id: namespaces
+    dir: namespaces
+  - env:
+      - CGO_ENABLED=0
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}'
+    goos:
+      - linux
+    goarch:
+      - amd64
+    binary: 'main'
+    id: tags
+    dir: tags
+archives:
+  - format: zip
+    name_template: '{{ .ProjectName }}_namespaces_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    id: namespaces
+    builds:
+      - namespaces
+  - format: zip
+    name_template: '{{ .ProjectName }}_tags_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    id: tags
+    builds:
+      - tags
+release:
+changelog:
+  skip: true
