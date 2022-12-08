@@ -140,8 +140,8 @@ Resources:
     DependsOn: logzioMetricStream
     Properties:
       Code:
-        S3Bucket: logzio-aws-integrations-us-east-1
-        S3Key: metric-stream-helpers/namespaces/1.1.0/function.zip
+        S3Bucket: logzio-aws-integrations-<<REGION>>
+        S3Key: metric-stream-helpers/namespaces/<<VERSION>>/function.zip
       FunctionName:  !Join ['-', [!Ref AWS::StackName, 'namespaces-func']]
       Handler: bootstrap
       Runtime: provided.al2
@@ -201,8 +201,8 @@ Resources:
     DependsOn: logzioMetricStream
     Properties:
       Code:
-        S3Bucket: logzio-aws-integrations-us-east-1
-        S3Key: metric-stream-helpers/tags/1.1.0/function.zip
+        S3Bucket: logzio-aws-integrations-<<REGION>>
+        S3Key: metric-stream-helpers/tags/<<VERSION>>/function.zip
       FunctionName: !Join [ '-', [ !Ref AWS::StackName, 'tags-func' ] ]
       Handler: main
       Runtime: go1.x
