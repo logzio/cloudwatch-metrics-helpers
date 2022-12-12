@@ -15,6 +15,8 @@ This Lambda collects tags from resources under selected AWS namespaces, and send
 
 #### Changelog:
 
+- **1.1.1**:
+  - Add label `logzio_agent_version` to metrics.
 - **1.1.0**:
   - Support adding all namespaces by setting `AWS_NAMESPACES` with `all-namespaces`.
   - Fix EBS service details

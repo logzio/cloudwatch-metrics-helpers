@@ -19,13 +19,15 @@ import (
 )
 
 const (
-	envAwsRegion             = "AWS_REGION" // reserved env
-	envAwsNamespaces         = "AWS_NAMESPACES"
-	envLogzioMetricsListener = "LOGZIO_METRICS_LISTENER"
-	envLogzioMetricsToken    = "LOGZIO_METRICS_TOKEN"
+	envAwsRegion                = "AWS_REGION" // reserved env
+	envAwsNamespaces            = "AWS_NAMESPACES"
+	envLogzioMetricsListener    = "LOGZIO_METRICS_LISTENER"
+	envLogzioMetricsToken       = "LOGZIO_METRICS_TOKEN"
+	envAwsLambdaFunctionVersion = "AWS_LAMBDA_FUNCTION_VERSION" // reserved env
 
-	emptyString   = ""
-	listSeparator = ","
+	emptyString             = ""
+	listSeparator           = ","
+	fieldLogzioAgentVersion = "logzio_agent_version"
 )
 
 var logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
@@ -210,6 +212,11 @@ func sendTags(ctx context.Context, resources []*resourcegroupstaggingapi.Resourc
 		} else {
 			attributes = append(attributes, idLabels...)
 		}
+
+		attributes = append(attributes, attribute.KeyValue{
+			Key:   fieldLogzioAgentVersion,
+			Value: attribute.StringValue(os.Getenv(envAwsLambdaFunctionVersion)),
+		})
 
 		counter.Add(ctx, int64(1), attributes...)
 	}
