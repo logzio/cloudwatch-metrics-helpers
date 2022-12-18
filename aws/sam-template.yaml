@@ -130,7 +130,7 @@ Resources:
       DeliveryStreamName: !Join ['-', ['LogzioDeliveryStream', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
       DeliveryStreamType: DirectPut
       HttpEndpointDestinationConfiguration:
-        RoleArn: !GetAtt logzioFirehoseLoggingRole.Arn
+        RoleARN: !GetAtt logzioFirehoseLoggingRole.Arn
         BufferingHints:
           IntervalInSeconds: !Ref httpEndpointDestinationIntervalInSeconds
           SizeInMBs: !Ref httpEndpointDestinationSizeInMBs
