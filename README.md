@@ -51,6 +51,10 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 ## Changelog:
 
+
+- **1.2.0**:
+  - Add label `logzio_agent_version` to `aws_resouece_info` metrics.
+  - Create log group and log stream for Firehose Delivery Stream.
 - **1.1.0**:
   - Support adding all namespaces by setting `awsNamespaces` with `all-namespaces`.
   - Tags function: fix EBS service details.

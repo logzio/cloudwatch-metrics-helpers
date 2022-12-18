@@ -44,6 +44,16 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Join ['-', ['logzio-metric-stream-backup', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+  logzioFirehoseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['-', ['logzio-metric-stream-firehose', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+  logzioLogStream:
+    DependsOn: logzioFirehoseLogGroup
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName: !Ref logzioFirehoseLogGroup
+      LogStreamName: !Join ['-', ['logzio-metric-stream-firehose', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
   logzioS3DestinationFirehoseRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -78,6 +88,41 @@ Resources:
                   - !Sub
                     - 'arn:aws:s3:::${BucketName}/*'
                     - BucketName: !Ref logzioS3BackupBucket
+              - Effect: Allow
+                Action:
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub
+                    - 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${NewLogGroupName}:${NewLogStreamName}:*'
+                    - NewLogGroupName: !Ref logzioFirehoseLogGroup
+                      NewLogStreamName: !Ref logzioLogStream
+  logzioFirehoseLoggingRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join [ '-', [ 'LogzioFirehoseLoggingRole', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - firehose.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Join [ '-', [ 'LogzioFirehoseLoggingPolicy', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub
+                    - 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${NewLogGroupName}:${NewLogStreamName}:*'
+                    - NewLogGroupName: !Ref logzioFirehoseLogGroup
+                      NewLogStreamName: !Ref logzioLogStream
   logzioDeliveryStream:
     DependsOn: logzioS3BackupBucket
     Type: AWS::KinesisFirehose::DeliveryStream
@@ -85,6 +130,7 @@ Resources:
       DeliveryStreamName: !Join ['-', ['LogzioDeliveryStream', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
       DeliveryStreamType: DirectPut
       HttpEndpointDestinationConfiguration:
+        RoleArn: !GetAtt logzioFirehoseLoggingRole.Arn
         BufferingHints:
           IntervalInSeconds: !Ref httpEndpointDestinationIntervalInSeconds
           SizeInMBs: !Ref httpEndpointDestinationSizeInMBs
@@ -98,6 +144,11 @@ Resources:
         S3Configuration:
           BucketARN: !GetAtt logzioS3BackupBucket.Arn
           RoleARN: !GetAtt logzioS3DestinationFirehoseRole.Arn
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref logzioFirehoseLogGroup
+          LogStreamName: !Ref logzioLogStream
+
   logzioMetricStreamRole:
     Type: 'AWS::IAM::Role'
     Properties:
