@@ -25,6 +25,8 @@ const (
 	unitCount                = "Count"
 	metricNameNumObjects     = "NumberOfObjects"
 	metricNameSizeBytes      = "BucketSizeBytes"
+	storageTypeStandard      = "StandardStorage"
+	storageTypeAll           = "AllStorageTypes"
 )
 
 func main() {
@@ -63,12 +65,12 @@ func handleRequest(ctx context.Context) (string, error) {
 	for _, bucket := range buckets.Buckets {
 		fmt.Println(*bucket.Name)
 		// Get the NumberOfObjects metric for the bucket
-		NumberOfObjectsErr := collectCloudwatchMetric(metricNameNumObjects, unitCount, bucket, ctx, &meter, cw)
+		NumberOfObjectsErr := collectCloudwatchMetric(metricNameNumObjects, unitCount, storageTypeAll, bucket, ctx, &meter, cw)
 		if NumberOfObjectsErr != nil {
 			return NumberOfObjectsErr.Error(), NumberOfObjectsErr
 		}
 		// Get the BucketSizeBytes metric for the bucket
-		BucketSizeBytesErr := collectCloudwatchMetric(metricNameSizeBytes, unitBytes, bucket, ctx, &meter, cw)
+		BucketSizeBytesErr := collectCloudwatchMetric(metricNameSizeBytes, unitBytes, storageTypeStandard, bucket, ctx, &meter, cw)
 		if BucketSizeBytesErr != nil {
 			return BucketSizeBytesErr.Error(), BucketSizeBytesErr
 		}
@@ -78,7 +80,7 @@ func handleRequest(ctx context.Context) (string, error) {
 }
 
 // collectCloudwatchMetric Collects a Cloudwatch metric for a given bucket and metric name
-func collectCloudwatchMetric(name string, unit string, bucket *s3.Bucket, ctx context.Context, meter *metric.Meter, cw *cloudwatch.CloudWatch) error {
+func collectCloudwatchMetric(name string, unit string, storageType string, bucket *s3.Bucket, ctx context.Context, meter *metric.Meter, cw *cloudwatch.CloudWatch) error {
 	// Get the NumberOfObjects metric for the bucket
 	cloudwatchMetric, err := cw.GetMetricData(&cloudwatch.GetMetricDataInput{
 		MetricDataQueries: []*cloudwatch.MetricDataQuery{
@@ -95,7 +97,7 @@ func collectCloudwatchMetric(name string, unit string, bucket *s3.Bucket, ctx co
 							},
 							{
 								Name:  aws.String("StorageType"),
-								Value: aws.String("AllStorageTypes"),
+								Value: aws.String(storageType),
 							},
 						},
 					},
