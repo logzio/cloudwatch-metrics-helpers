@@ -40,3 +40,34 @@ aws lambda invoke \
 output.json
 ```
 This will invoke the function and save the output to the output.json file.
+
+### Minimum AWS IAM Permissions Required
+For the AWS Lambda function to be able to collect CloudWatch metrics and list S3 buckets, it will need the following permissions:
+
+- `cloudwatch:GetMetricData`: Allows the function to retrieve CloudWatch metrics.
+- `s3:ListBuckets`: Allows the function to list the S3 buckets in the account.
+You can grant these permissions to the function by attaching the following IAM policy to the IAM role that is associated with the function:
+
+```shell
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "CloudWatchMetrics",
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:GetMetricData"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "S3ListBuckets",
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBuckets"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
