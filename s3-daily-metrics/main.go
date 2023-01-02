@@ -18,15 +18,21 @@ import (
 )
 
 const (
-	envLogzioMetricsListener = "LOGZIO_METRICS_LISTENER"
-	envLogzioMetricsToken    = "LOGZIO_METRICS_TOKEN"
-	fieldLogzioAgentVersion  = "logzio_agent_version"
-	unitBytes                = "Bytes"
-	unitCount                = "Count"
-	metricNameNumObjects     = "NumberOfObjects"
-	metricNameSizeBytes      = "BucketSizeBytes"
-	storageTypeStandard      = "StandardStorage"
-	storageTypeAll           = "AllStorageTypes"
+	envLogzioMetricsListener     = "LOGZIO_METRICS_LISTENER"
+	envLogzioMetricsToken        = "LOGZIO_METRICS_TOKEN"
+	fieldLogzioAgentVersion      = "logzio_agent_version"
+	fieldLogzioAgentVersionValue = "1.0.0"
+	fieldP8slogzioName           = "p8s_logzio_name"
+	fieldP8slogzioNameValue      = "cloudwatch-helpers"
+	filedNameSpace               = "namespace"
+	filedNameSpaceValue          = "aws/s3"
+	filedBucketName              = "bucketname"
+	unitBytes                    = "Bytes"
+	unitCount                    = "Count"
+	metricNameNumObjects         = "NumberOfObjects"
+	metricNameSizeBytes          = "BucketSizeBytes"
+	storageTypeStandard          = "StandardStorage"
+	storageTypeAll               = "AllStorageTypes"
 )
 
 func main() {
@@ -63,7 +69,6 @@ func handleRequest(ctx context.Context) (string, error) {
 	}
 	// Iterate through the buckets and get the NumberOfObjects and BucketSizeBytes metrics for each bucket
 	for _, bucket := range buckets.Buckets {
-		fmt.Println(*bucket.Name)
 		// Get the NumberOfObjects metric for the bucket
 		NumberOfObjectsErr := collectCloudwatchMetric(metricNameNumObjects, unitCount, storageTypeAll, bucket, ctx, &meter, cw)
 		if NumberOfObjectsErr != nil {
@@ -75,7 +80,6 @@ func handleRequest(ctx context.Context) (string, error) {
 			return BucketSizeBytesErr.Error(), BucketSizeBytesErr
 		}
 	}
-	fmt.Println("Done")
 	return "Success", nil
 }
 
@@ -116,13 +120,32 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 	}
 	if len(cloudwatchMetric.MetricDataResults) > 0 {
 		if len(cloudwatchMetric.MetricDataResults[0].Values) > 0 {
+			// Attributes for the metric
+			attributes := make([]attribute.KeyValue, 0)
+			// Add the bucket name as an attribute
+			attributes = append(attributes, attribute.KeyValue{
+				Key:   filedBucketName,
+				Value: attribute.StringValue(*bucket.Name),
+			})
+			// Add logzio_agent_version as an attribute
+			attributes = append(attributes, attribute.KeyValue{
+				Key:   fieldLogzioAgentVersion,
+				Value: attribute.StringValue(fieldLogzioAgentVersionValue),
+			})
+			// Add namespace attribute
+			attributes = append(attributes, attribute.KeyValue{
+				Key:   filedNameSpace,
+				Value: attribute.StringValue(filedNameSpaceValue),
+			})
+			// Add p8s_logzio_name attribute
+			attributes = append(attributes, attribute.KeyValue{
+				Key:   fieldP8slogzioName,
+				Value: attribute.StringValue(fieldP8slogzioNameValue),
+			})
 			metricValue := int64(*cloudwatchMetric.MetricDataResults[0].Values[0])
 			prometheusCloudwacthMetric := metric.Must(*meter).NewInt64UpDownCounter("aws_s3_" + strings.ToLower(name) + "_max")
-			bucketNameAtt := attribute.KeyValue{
-				Key:   "bucketname",
-				Value: attribute.StringValue(*bucket.Name),
-			}
-			prometheusCloudwacthMetric.Add(ctx, metricValue, bucketNameAtt)
+
+			prometheusCloudwacthMetric.Add(ctx, metricValue, attributes...)
 		}
 	}
 	return nil
