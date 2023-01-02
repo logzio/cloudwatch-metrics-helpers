@@ -1,5 +1,5 @@
 ## AWS CloudWatch S3 Metrics Collector for AWS Lambda
-This Go program is designed to be used as an AWS Lambda function that collects CloudWatch metrics for all S3 buckets in an AWS account, and exports the metrics to Logz.io. The program collects the NumberOfObjects and BucketSizeBytes metrics for each bucket, and exports them with the following dimensions:
+This Go program is designed to be used as an AWS Lambda function that collects CloudWatch metrics for all S3 buckets in an AWS account, and exports the metrics to Logz.io. The program collects the `NumberOfObjects` and `BucketSizeBytes` metrics for each bucket, and exports them with the following dimensions:
 
 - `BucketName`: The name of the S3 bucket
 
