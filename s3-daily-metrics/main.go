@@ -3,6 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go/service/s3"
 	metricsExporter "github.com/logzio/go-metrics-sdk"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -10,11 +15,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 const (
@@ -36,11 +36,7 @@ const (
 )
 
 func main() {
-	//lambda.Start(handleRequest)
-	request, err := handleRequest(context.Background())
-	if err != nil {
-		print(request)
-	}
+	lambda.Start(handleRequest)
 }
 
 // handleRequest is the entry point for the Lambda function

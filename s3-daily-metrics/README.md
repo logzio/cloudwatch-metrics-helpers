@@ -15,32 +15,6 @@ Before you can use this program, you will need to do the following:
 - `LOGZIO_METRICS_LISTENER`: The Logz.io listener URL
 - `LOGZIO_METRICS_TOKEN`: The Logz.io token
 
-### Deploying to AWS Lambda using the AWS CLI
-To deploy the source code to AWS Lambda using the AWS CLI, you will need to do the following:
-
-- Install the AWS CLI and configure it with your AWS credentials.
-- Create a new AWS Lambda function by running the following command:
-```shell
-aws lambda create-function \
---function-name <function-name> \
---runtime go1.x \
---handler main \
---environment Variables={LOGZIO_METRICS_LISTENER=<listener-url>,LOGZIO_METRICS_TOKEN=<token>} \
---zip-file fileb://function.zip
-```
-- Replace `<function-name>`, `<listener-url>`, and `<token>` with your desired function name, Logz.io listener URL, and Logz.io token, respectively. The function.zip file should contain the compiled Go binary and all its dependencies.
-
-To create the function.zip file, you can run the `make function` command.
-
-- Test the function by running the following command:
-```shell
-aws lambda invoke \
---function-name <function-name> \
---payload '{}' \
-output.json
-```
-This will invoke the function and save the output to the output.json file.
-
 ### Minimum AWS IAM Permissions Required
 For the AWS Lambda function to be able to collect CloudWatch metrics and list S3 buckets, it will need the following permissions:
 

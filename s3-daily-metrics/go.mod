@@ -3,8 +3,12 @@ module github.com/logzio/cloudwatch-metrics-helpers/s3-daily-metrics
 go 1.19
 
 require (
+	github.com/aws/aws-lambda-go v1.13.3
 	github.com/aws/aws-sdk-go v1.44.167
 	github.com/logzio/go-metrics-sdk v1.0.0
+	go.opentelemetry.io/otel v1.4.1
+	go.opentelemetry.io/otel/metric v0.27.0
+	go.opentelemetry.io/otel/sdk/metric v0.27.0
 )
 
 require (
@@ -15,11 +19,8 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/prometheus/prometheus v1.8.2-0.20210928085443-fafb309d4027 // indirect
 	github.com/stretchr/testify v1.7.2 // indirect
-	go.opentelemetry.io/otel v1.4.1 // indirect
 	go.opentelemetry.io/otel/internal/metric v0.27.0 // indirect
-	go.opentelemetry.io/otel/metric v0.27.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.4.1 // indirect
-	go.opentelemetry.io/otel/sdk/metric v0.27.0 // indirect
 	go.opentelemetry.io/otel/trace v1.4.1 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 )
