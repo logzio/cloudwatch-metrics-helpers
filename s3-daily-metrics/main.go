@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-lambda-go/cfn"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -39,8 +40,33 @@ func main() {
 	lambda.Start(handleRequest)
 }
 
-// handleRequest is the entry point for the Lambda function
-func handleRequest(ctx context.Context) (string, error) {
+func handleRequest(ctx context.Context, event cfn.Event) (string, error) {
+	// If requestID is empty - the lambda call is not from a custom resource
+	if event.RequestID == "" && event.RequestType == cfn.RequestCreate {
+		_, err := s3DailyMetricsHandler(ctx)
+		if err != nil {
+			fmt.Printf("Encountered an error: %s", err.Error())
+			return "Encountered an error, lambda finished with error", err
+		}
+	} else {
+		// Custom resource invocation
+		lambda.Start(cfn.LambdaWrap(customResourceHandler))
+	}
+	return "Lambda finished", nil
+}
+
+// Wrapper for first invocation from cloud formation custom resource
+func customResourceHandler(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
+	_, err = s3DailyMetricsHandler(ctx)
+	if err != nil {
+		fmt.Printf("Encountered an error: %s", err.Error())
+		return
+	}
+	return
+}
+
+// handler is the entry point for the Lambda function
+func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 	exporter, err := configureMetricsExporter()
 	if err != nil {
 		return "", err
@@ -93,7 +119,7 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 						Dimensions: []*cloudwatch.Dimension{
 							{
 								Name:  aws.String("BucketName"),
-								Value: bucket.Name,
+								Value: aws.String("*"),
 							},
 							{
 								Name:  aws.String("StorageType"),
@@ -139,9 +165,8 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 				Value: attribute.StringValue(fieldP8slogzioNameValue),
 			})
 			metricValue := int64(*cloudwatchMetric.MetricDataResults[0].Values[0])
-			prometheusCloudwacthMetric := metric.Must(*meter).NewInt64UpDownCounter("aws_s3_" + strings.ToLower(name) + "_max")
-
-			prometheusCloudwacthMetric.Add(ctx, metricValue, attributes...)
+			prometheusCloudwatchMetric := metric.Must(*meter).NewInt64UpDownCounter("aws_s3_" + strings.ToLower(name) + "_max")
+			prometheusCloudwatchMetric.Add(ctx, metricValue, attributes...)
 		}
 	}
 	return nil
