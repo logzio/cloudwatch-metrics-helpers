@@ -38,7 +38,8 @@ Parameters:
     Type: Number
     Description: 'The size of the buffer, in MBs, that Kinesis Data Firehose uses for incoming data before delivering it to the destination'
     Default: 5
-
+Conditions:
+  DeployS3MetricsLambda: !Equals [!Contains [!Split [ ',', !Ref awsNamespaces ], 'AWS/S3'], true]
 Resources:
   logzioS3BackupBucket:
     Type: AWS::S3::Bucket
@@ -247,6 +248,88 @@ Resources:
                   - 'iam:PassRole'
                 Resource:
                   - !GetAtt logzioMetricStreamRole.Arn
+  logzioS3MetricsLambda:
+    Type: 'AWS::Lambda::Function'
+    DependsOn: logzioMetricStream
+    Properties:
+      Code:
+        S3Bucket: logzio-aws-integrations-<<REGION>>
+        S3Key: metric-stream-helpers/s3-daily-metrics/<<VERSION>>/function.zip
+      FunctionName: !Join [ '-', [ !Ref AWS::StackName, 's3-metrics-func' ] ]
+      Handler: main
+      Runtime: go1.x
+      Role: !GetAtt logzioTagsLambdaRole.Arn
+      Timeout: 180
+      MemorySize: 512
+      Condition: DeployS3MetricsLambda
+      Events:
+        MyTimeTrigger:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 day)
+      Environment:
+        Variables:
+          LOGZIO_METRICS_LISTENER: !Ref logzioListener
+          LOGZIO_METRICS_TOKEN: !Ref logzioToken
+  logzioS3MetricsLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Condition: DeployS3MetricsLambda
+      RoleName: !Join [ '-', [ 'logzioS3MetricsLambdaRole', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Join [ '-', [ 'logzioS3MetricsLambdaPolicy', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'cloudwatch:GetMetricData'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:ListBucket'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                Resource: '*'
+  logzioS3MetricsLambdaTrigger:
+    DependsOn:   logzioS3MetricsLambda
+    Type: AWS::Events::Rule
+    Properties:
+      Condition: DeployS3MetricsLambda
+      Description: 'This event is a cron job that triggers every 24 hours the Logz.io s3 metrics collector Lambda function.'
+      ScheduleExpression: rate(1 day)
+      Name: !Join [ '-', [ 'logzioS3MetricsLambdaTrigger', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt   logzioS3MetricsLambda.Arn
+          Id: 'logzioS3MetricsLambda'
+  logzioS3MetricsLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Condition: DeployS3MetricsLambda
+      FunctionName: !Ref logzioS3MetricsLambda
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt logzioS3MetricsLambdaTrigger.Arn
+
   logzioMetricStreamAddTagsLambda:
     Type: 'AWS::Lambda::Function'
     DependsOn: logzioMetricStream
