@@ -37,26 +37,39 @@ const (
 )
 
 func main() {
-	lambda.Start(handleRequest)
+	lambda.Start(HandleRequest)
 }
 
-func handleRequest(ctx context.Context, event cfn.Event) (string, error) {
-	// If requestID is empty - the lambda call is not from a custom resource
-	if event.RequestID == "" && event.RequestType == cfn.RequestCreate {
+func HandleRequest(ctx context.Context, event cfn.Event) (string, error) {
+	//
+	if event.RequestID == "" {
+		fmt.Println("Scheduled invocation")
+		// Scheduled invocation
 		_, err := s3DailyMetricsHandler(ctx)
 		if err != nil {
 			fmt.Printf("Encountered an error: %s", err.Error())
 			return "Encountered an error, lambda finished with error", err
 		}
 	} else {
-		// Custom resource invocation
-		lambda.Start(cfn.LambdaWrap(customResourceHandler))
+		if event.RequestType == cfn.RequestCreate {
+			fmt.Println("Custom resource invocation")
+			// Custom resource invocation
+			lambda.Start(cfn.LambdaWrap(customResourceHandler))
+		} else {
+			lambda.Start(cfn.LambdaWrap(customResourceDoNothing))
+		}
 	}
 	return "Lambda finished", nil
 }
 
+// Wrapper for Read, Update, Delete requests
+func customResourceDoNothing(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
+	return
+}
+
 // Wrapper for first invocation from cloud formation custom resource
 func customResourceHandler(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
+	fmt.Println("Starting customResourceHandler")
 	_, err = s3DailyMetricsHandler(ctx)
 	if err != nil {
 		fmt.Printf("Encountered an error: %s", err.Error())
@@ -65,8 +78,9 @@ func customResourceHandler(ctx context.Context, event cfn.Event) (physicalResour
 	return
 }
 
-// handler is the entry point for the Lambda function
+// s3DailyMetricsHandler Handles the scheduled invocation
 func s3DailyMetricsHandler(ctx context.Context) (string, error) {
+	fmt.Println("Starting s3DailyMetricsHandler")
 	exporter, err := configureMetricsExporter()
 	if err != nil {
 		return "", err
@@ -76,29 +90,36 @@ func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 	}()
 	meter := exporter.Meter("aws_s3")
 	// Create a new AWS session
+	fmt.Println("Creating new AWS session")
 	sess, err := session.NewSession(&aws.Config{Region: aws.String("us-east-1")})
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
 	// Create a new CloudWatch client
+	fmt.Println("Creating new CloudWatch client")
 	cw := cloudwatch.New(sess)
 	// Create a new S3 client
+	fmt.Println("Creating new S3 client")
 	s3Client := s3.New(sess)
 	// List all the buckets in the S3 namespace
+	fmt.Println("Listing all the buckets in the S3 namespace")
 	buckets, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
 		return err.Error(), err
 	}
 	// Iterate through the buckets and get the NumberOfObjects and BucketSizeBytes metrics for each bucket
+	fmt.Println("Iterating through the buckets and get the NumberOfObjects and BucketSizeBytes metrics for each bucket")
 	for _, bucket := range buckets.Buckets {
 		// Get the NumberOfObjects metric for the bucket
 		NumberOfObjectsErr := collectCloudwatchMetric(metricNameNumObjects, unitCount, storageTypeAll, bucket, ctx, &meter, cw)
 		if NumberOfObjectsErr != nil {
+			fmt.Printf("Error while collecting NumberOfObjects metric for bucket %s: %s", *bucket.Name, NumberOfObjectsErr.Error())
 			return NumberOfObjectsErr.Error(), NumberOfObjectsErr
 		}
 		// Get the BucketSizeBytes metric for the bucket
 		BucketSizeBytesErr := collectCloudwatchMetric(metricNameSizeBytes, unitBytes, storageTypeStandard, bucket, ctx, &meter, cw)
 		if BucketSizeBytesErr != nil {
+			fmt.Printf("Error while collecting BucketSizeBytes metric for bucket %s: %s", *bucket.Name, BucketSizeBytesErr.Error())
 			return BucketSizeBytesErr.Error(), BucketSizeBytesErr
 		}
 	}
@@ -119,7 +140,7 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 						Dimensions: []*cloudwatch.Dimension{
 							{
 								Name:  aws.String("BucketName"),
-								Value: aws.String("*"),
+								Value: aws.String(*bucket.Name),
 							},
 							{
 								Name:  aws.String("StorageType"),
