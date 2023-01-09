@@ -2,5 +2,8 @@ build:
 	go build main.go
 
 function:
-	GOARCH=amd64 GOOS=linux go build main.go
-	zip -r function.zip main
+#!/bin/bash
+	GOARCH=amd64 GOOS=linux go build -o bootstrap
+	chmod +x bootstrap
+	zip -r function.zip bootstrap
+	rm bootstrap
