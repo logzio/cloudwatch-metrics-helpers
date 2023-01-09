@@ -35,10 +35,19 @@ You can grant these permissions to the function by attaching the following IAM p
             "Resource": "*"
         },
         {
+            "Sid": "CloudWatchMetrics",
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:GetMetricData"
+            ],
+            "Resource": "*"
+        },
+        {
             "Sid": "S3ListBuckets",
             "Effect": "Allow",
             "Action": [
-                "s3:ListBuckets"
+                "s3:ListBuckets",
+                "s3:ListAllMyBuckets"
             ],
             "Resource": "*"
         }
