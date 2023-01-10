@@ -41,6 +41,14 @@ jobs:
           VERSION_NUMBER: ${{ github.event.release.tag_name }}
           PATH_TO_FILE: ${{ github.workspace }}/aws/sam-template.yaml
         run: python release/main.py
+      - name: Upload Cloudformation s3 daily metrics template
+        env:
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          FOLDER_NAME: metric-stream-helpers/aws
+          VERSION_NUMBER: ${{ github.event.release.tag_name }}
+          PATH_TO_FILE: ${{ github.workspace }}/aws/sam-s3-daily-metrics.yaml
+        run: python release/main.py
       - name: Download release for namespaces
         run: wget -c https://github.com/logzio/cloudwatch-metrics-helpers/releases/download/${{ github.event.release.tag_name }}/cloudwatch-metrics-helpers_namespaces_${{ github.event.release.tag_name }}_linux_amd64.zip -O function.zip
       - name: Upload Zip - namespaces
@@ -60,6 +68,18 @@ jobs:
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
           FOLDER_NAME: metric-stream-helpers/tags
+          VERSION_NUMBER: ${{ github.event.release.tag_name }}
+          PATH_TO_FILE: ${{ github.workspace }}/function.zip
+        run: python release/main.py
+      - name: delete zip
+        run: rm function.zip
+      - name: Download release for s3-daily-metrics
+        run: wget -c https://github.com/logzio/cloudwatch-metrics-helpers/releases/download/${{ github.event.release.tag_name }}/cloudwatch-metrics-helpers_s3-daily-metrics_${{ github.event.release.tag_name }}_linux_amd64.zip -O function.zip
+      - name: Upload Zip - s3-daily-metrics
+        env:
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          FOLDER_NAME: metric-stream-helpers/s3-daily-metrics
           VERSION_NUMBER: ${{ github.event.release.tag_name }}
           PATH_TO_FILE: ${{ github.workspace }}/function.zip
         run: python release/main.py
