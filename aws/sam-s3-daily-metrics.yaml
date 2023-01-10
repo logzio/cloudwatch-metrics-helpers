@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: "Send Cloudwatch metrics from your CloudWatch to Logz.io"
+Parameters:
+  logzioToken:
+    Type: String
+    Description: 'Your Logz.io log shipping token'
+    MinLength: 1
+  logzioListener:
+    Type: String
+    Description: 'Your Logz.io listener'
+Resources:
+  logzioS3MetricsLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        S3Bucket: logzio-aws-integrations-<<REGION>>
+        S3Key: metric-stream-helpers/s3-daily-metrics/<<VERSION>>/function.zip
+      FunctionName: !Join [ '-', [ !Ref AWS::StackName, 's3-metrics-func' ] ]
+      Handler: bootstrap
+      Runtime: provided.al2
+      Role: !GetAtt logzioS3MetricsLambdaRole.Arn
+      Timeout: 180
+      MemorySize: 128
+      Environment:
+        Variables:
+          LOGZIO_METRICS_LISTENER: !Ref logzioListener
+          LOGZIO_METRICS_TOKEN: !Ref logzioToken
+  logzioS3MetricsLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join [ '-', [ 'logzioS3MetricsLambdaRole', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Join [ '-', [ 'logzioS3MetricsLambdaPolicy', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'cloudwatch:GetMetricData'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:ListBuckets'
+                  - 's3:ListAllMyBuckets'
+                Resource: '*'
+  logzioS3MetricsLambdaTrigger:
+    DependsOn:   logzioS3MetricsLambda
+    Type: AWS::Events::Rule
+    Properties:
+      Description: 'This event is a cron job that triggers every 24 hours the Logz.io s3 metrics collector Lambda function.'
+      ScheduleExpression: rate(1 day)
+      Name: !Join [ '-', [ 'logzioS3MetricsLambdaTrigger', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt   logzioS3MetricsLambda.Arn
+          Id: 'logzioS3MetricsLambda'
+  logzioS3MetricsLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref logzioS3MetricsLambda
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt logzioS3MetricsLambdaTrigger.Arn
+  logzioS3MetricsLambdaPrimerInvoke:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: logzioS3MetricsLambda
+    Version: '1.0'
+    Properties:
+      ServiceToken: !GetAtt logzioS3MetricsLambda.Arn
