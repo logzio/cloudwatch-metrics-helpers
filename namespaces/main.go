@@ -29,6 +29,7 @@ const (
 	envLogzioMetricsListener   = "LOGZIO_METRICS_LISTENER"
 	envLogzioMetricsToken      = "LOGZIO_METRICS_TOKEN"
 	envStackName               = "STACK_NAME"
+	version                    = "latest"
 )
 
 var logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
@@ -143,7 +144,7 @@ func run() error {
 			},
 		}
 		stackName := fmt.Sprintf("%v-s3", currentStack)
-		templateUrl := fmt.Sprintf("https://logzio-aws-integrations-%v.s3.amazonaws.com/metric-stream-helpers/aws/1.2.1/sam-s3-daily-metrics.yaml", os.Getenv(envAwsRegion))
+		templateUrl := fmt.Sprintf("https://logzio-aws-integrations-%v.s3.amazonaws.com/metric-stream-helpers/aws/%v/sam-s3-daily-metrics.yaml", os.Getenv(envAwsRegion), version)
 		// Create a new CloudFormation stack
 		_, cfErr := cloudformationClient.CreateStack(&cloudformation.CreateStackInput{
 			StackName:   aws.String(stackName),
