@@ -19,29 +19,38 @@ import (
 )
 
 const (
-	envLogzioMetricsListener     = "LOGZIO_METRICS_LISTENER"
-	envLogzioMetricsToken        = "LOGZIO_METRICS_TOKEN"
+	// envLogzioMetricsListener The environment variable name for the Logz.io listener
+	envLogzioMetricsListener = "LOGZIO_METRICS_LISTENER"
+	// envLogzioMetricsToken The environment variable name for the Logz.io token
+	envLogzioMetricsToken = "LOGZIO_METRICS_TOKEN"
+	// fieldLogzioAgentVersion The field name for the Logz.io agent version
 	fieldLogzioAgentVersion      = "logzio_agent_version"
 	fieldLogzioAgentVersionValue = "1.0.0"
-	fieldP8slogzioName           = "p8s_logzio_name"
-	fieldP8slogzioNameValue      = "cloudwatch-helpers"
-	fieldNameSpace               = "namespace"
-	fieldNameSpaceValue          = "aws/s3"
-	fieldBucketName              = "bucketname"
-	fieldRegion                  = "region"
-	fieldAccount                 = "account"
-	unitBytes                    = "Bytes"
-	unitCount                    = "Count"
-	metricNameNumObjects         = "NumberOfObjects"
-	metricNameSizeBytes          = "BucketSizeBytes"
-	storageTypeStandard          = "StandardStorage"
-	storageTypeAll               = "AllStorageTypes"
+	// fieldP8slogzioName
+	fieldP8slogzioName      = "p8s_logzio_name"
+	fieldP8slogzioNameValue = "cloudwatch-helpers"
+	// fieldNameSpace The field name for the namespace
+	fieldNameSpace      = "namespace"
+	fieldNameSpaceValue = "aws/s3"
+	// fieldBucketName The field name for the bucket name
+	fieldBucketName = "bucketname"
+	// fieldRegion The field name for the region
+	fieldRegion = "region"
+	// fieldAccount The field name for the aws account
+	fieldAccount         = "account"
+	unitBytes            = "Bytes"
+	unitCount            = "Count"
+	metricNameNumObjects = "NumberOfObjects"
+	metricNameSizeBytes  = "BucketSizeBytes"
+	storageTypeStandard  = "StandardStorage"
+	storageTypeAll       = "AllStorageTypes"
 )
 
 func main() {
 	lambda.Start(HandleRequest)
 }
 
+// HandleRequest is the entry point for the Lambda function
 func HandleRequest(ctx context.Context, event cfn.Event) (string, error) {
 	//
 	if event.RequestID == "" {
@@ -158,20 +167,35 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 					},
 				},
 			},
-			// Set the start time to 1 day ago
+			// Set the start time to 2 day ago
 			StartTime: aws.Time(time.Now().Add(-48 * time.Hour)),
 			EndTime:   aws.Time(time.Now()),
 		})
+		// No error, break out of the loop
 		if err == nil {
 			break
 		}
+		// Check for 4XX errors and cancel the retry if we encounter one
+		if strings.Contains(err.Error(), "403") {
+			fmt.Printf("Received 403 error, Retry aborted. Error: %s", err.Error())
+			break
+		}
+		if strings.Contains(err.Error(), "404") {
+			fmt.Printf("Received 404 error, Retry aborted. Error: %s", err.Error())
+			break
+		}
+		if strings.Contains(err.Error(), "400") {
+			fmt.Printf("Received 400 error, Retry aborted. Error: %s", err.Error())
+			break
+		}
+		// Handle non 4XX errors with retry logic
 		fmt.Printf("Error while performing GetMetricData api call for bucket %s. Trying again in %v seconds. Error: %s", *bucket.Name, backoff, err.Error())
 		// wait before retrying (exponential backoff)
 		time.Sleep(time.Duration(backoff) * time.Second)
 		backoff = backoff * 2
 	}
 	if err != nil {
-		fmt.Printf("GetMetricData api call for bucket %s failed after 3 attempts. Error: %s", *bucket.Name, err.Error())
+		fmt.Printf("GetMetricData api call for bucket %s failed. Error: %s", *bucket.Name, err.Error())
 		return err
 	}
 	if len(cloudwatchMetric.MetricDataResults) > 0 {
