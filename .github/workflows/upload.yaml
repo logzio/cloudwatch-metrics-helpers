@@ -41,12 +41,20 @@ jobs:
           VERSION_NUMBER: ${{ github.event.release.tag_name }}
           PATH_TO_FILE: ${{ github.workspace }}/aws/sam-template.yaml
         run: python release/main.py
-      - name: Upload Cloudformation s3 daily metrics template
+      - name: Upload Cloudformation s3 daily metrics template (release)
         env:
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
           FOLDER_NAME: metric-stream-helpers/aws
           VERSION_NUMBER: ${{ github.event.release.tag_name }}
+          PATH_TO_FILE: ${{ github.workspace }}/aws/sam-s3-daily-metrics.yaml
+        run: python release/main.py
+      - name: Upload Cloudformation s3 daily metrics template (latest)
+        env:
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          FOLDER_NAME: metric-stream-helpers/aws
+          VERSION_NUMBER: latest
           PATH_TO_FILE: ${{ github.workspace }}/aws/sam-s3-daily-metrics.yaml
         run: python release/main.py
       - name: Download release for namespaces
