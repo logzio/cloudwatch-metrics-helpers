@@ -38,7 +38,6 @@ Parameters:
     Type: Number
     Description: 'The size of the buffer, in MBs, that Kinesis Data Firehose uses for incoming data before delivering it to the destination'
     Default: 5
-
 Resources:
   logzioS3BackupBucket:
     Type: AWS::S3::Bucket
@@ -202,10 +201,13 @@ Resources:
       ReservedConcurrentExecutions: 1
       Environment:
         Variables:
+          LOGZIO_METRICS_LISTENER: !Ref logzioListener
+          LOGZIO_METRICS_TOKEN: !Ref logzioToken
           AWS_NAMESPACES: !Ref awsNamespaces
           METRIC_STREAM_NAME: !Ref logzioMetricStream
           FIREHOSE_ARN: !GetAtt logzioDeliveryStream.Arn
           METRIC_STREAM_ROLE_ARN: !GetAtt logzioMetricStreamRole.Arn
+          STACK_NAME: !Ref AWS::StackName
   logzioNamespacesPrimerInvoke:
     Type: AWS::CloudFormation::CustomResource
     DependsOn: logzioMetricStreamAddNamespacesLambda
@@ -236,17 +238,55 @@ Resources:
                   - 'logs:CreateLogGroup'
                   - 'logs:CreateLogStream'
                   - 'logs:PutLogEvents'
-                Resource: '*'
-              - Effect: Allow
-                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                  - 'cloudformation:CreateStack'
+                  - 'cloudformation:UpdateStack'
+                  - 'cloudformation:DescribeStackEvents'
+                  - 'cloudformation:CreateChangeSet'
+                  - 'cloudwatch:PutMetricData'
                   - 'cloudwatch:PutMetricStream'
-                Resource:
-                  - !GetAtt logzioMetricStream.Arn
+                  - 'lambda:CreateFunction'
+                  - 'lambda:InvokeFunction'
+                  - 'lambda:UpdateFunctionCode'
+                  - 'lambda:UpdateFunctionConfiguration'
+                  - 'lambda:ListFunctions'
+                  - 'lambda:GetFunction'
+                  - 'lambda:DeleteFunction'
+                  - 'lambda:AddPermission'
+                  - 'lambda:RemovePermission'
+                  - 'iam:PassRole'
+                  - 'iam:CreateRole'
+                  - 'iam:CreatePolicy'
+                  - 'iam:GetRole'
+                  - 'iam:AttachRolePolicy'
+                  - 'iam:GetPolicy'
+                  - 'iam:DeleteRole'
+                  - 'iam:DeletePolicy'
+                  - 'iam:DetachRolePolicy'
+                  - 'iam:GetRolePolicy'
+                  - 'iam:PutRolePolicy'
+                  - 's3:GetObject'
+                  - 's3:LisBucket'
+                  - 's3:ListAllMyBuckets'
+                  - 'events:PutRule'
+                  - 'events:GetRule'
+                  - 'events:PutTargets'
+                  - 'events:DescribeRule'
+                  - 'events:RemoveTargets'
+                  - 'custom-resource:Create'
+                  - 'custom-resource:Update'
+                  - 'custom-resource:Describe'
+                  - 'custom-resource:List'
+                  - 'custom-resource:Read'
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - 'iam:PassRole'
                 Resource:
                   - !GetAtt logzioMetricStreamRole.Arn
+
   logzioMetricStreamAddTagsLambda:
     Type: 'AWS::Lambda::Function'
     DependsOn: logzioMetricStream

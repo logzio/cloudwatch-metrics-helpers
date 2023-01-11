@@ -26,6 +26,20 @@ builds:
       - linux
     goarch:
       - amd64
+    binary: 'bootstrap'
+    id: s3-daily-metrics
+    dir: s3-daily-metrics
+  - env:
+      - CGO_ENABLED=0
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}'
+    goos:
+      - linux
+    goarch:
+      - amd64
     binary: 'main'
     id: tags
     dir: tags
@@ -35,6 +49,11 @@ archives:
     id: namespaces
     builds:
       - namespaces
+  - format: zip
+    name_template: '{{ .ProjectName }}_s3-daily-metrics_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    id: s3-daily-metrics
+    builds:
+      - s3-daily-metrics
   - format: zip
     name_template: '{{ .ProjectName }}_tags_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     id: tags
