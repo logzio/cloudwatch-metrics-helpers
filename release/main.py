@@ -100,7 +100,7 @@ def upload():
     if not file_exists:
         raise FileNotFoundError(f'Provided path to file ({path_to_file}) does not exists! Exiting')
     try:
-        is_cf_template = (path_to_file.split('/')[-1] == CF_TEMPLATE or path_to_file.split('/')[-1] == CF_TEMPLATE_s3)
+        is_cf_template = (path_to_file.split('/')[-1] == CF_TEMPLATE or path_to_file.split('/')[-1] == CF_TEMPLATE_S3)
         print(f'Is Cloudformation template: {is_cf_template}')
         if is_cf_template:
             cf_template_workflow(access_key, secret_key, folder_name, version_number, path_to_file)
