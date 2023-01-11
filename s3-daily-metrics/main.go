@@ -25,9 +25,11 @@ const (
 	fieldLogzioAgentVersionValue = "1.0.0"
 	fieldP8slogzioName           = "p8s_logzio_name"
 	fieldP8slogzioNameValue      = "cloudwatch-helpers"
-	filedNameSpace               = "namespace"
-	filedNameSpaceValue          = "aws/s3"
-	filedBucketName              = "bucketname"
+	fieldNameSpace               = "namespace"
+	fieldNameSpaceValue          = "aws/s3"
+	fieldBucketName              = "bucketname"
+	fieldRegion                  = "region"
+	fieldAccount                 = "account"
 	unitBytes                    = "Bytes"
 	unitCount                    = "Count"
 	metricNameNumObjects         = "NumberOfObjects"
@@ -176,7 +178,7 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 			attributes := make([]attribute.KeyValue, 0)
 			// Add the bucket name as an attribute
 			attributes = append(attributes, attribute.KeyValue{
-				Key:   filedBucketName,
+				Key:   fieldBucketName,
 				Value: attribute.StringValue(*bucket.Name),
 			})
 			// Add logzio_agent_version as an attribute
@@ -186,13 +188,23 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 			})
 			// Add namespace attribute
 			attributes = append(attributes, attribute.KeyValue{
-				Key:   filedNameSpace,
-				Value: attribute.StringValue(filedNameSpaceValue),
+				Key:   fieldNameSpace,
+				Value: attribute.StringValue(fieldNameSpaceValue),
 			})
 			// Add p8s_logzio_name attribute
 			attributes = append(attributes, attribute.KeyValue{
 				Key:   fieldP8slogzioName,
 				Value: attribute.StringValue(fieldP8slogzioNameValue),
+			})
+			// Add aws region attribute
+			attributes = append(attributes, attribute.KeyValue{
+				Key:   fieldRegion,
+				Value: attribute.StringValue(os.Getenv("AWS_REGION")),
+			})
+			// Add aws account attribute
+			attributes = append(attributes, attribute.KeyValue{
+				Key:   fieldAccount,
+				Value: attribute.StringValue(os.Getenv("AWS_ACCOUNT_ID")),
 			})
 			metricValue := int64(*cloudwatchMetric.MetricDataResults[0].Values[0])
 			prometheusCloudwatchMetric := metric.Must(*meter).NewInt64UpDownCounter("aws_s3_" + strings.ToLower(name) + "_max")
