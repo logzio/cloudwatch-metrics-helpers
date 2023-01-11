@@ -114,13 +114,11 @@ func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 		NumberOfObjectsErr := collectCloudwatchMetric(metricNameNumObjects, unitCount, storageTypeAll, bucket, ctx, &meter, cw)
 		if NumberOfObjectsErr != nil {
 			fmt.Printf("Error while collecting NumberOfObjects metric for bucket %s: %s", *bucket.Name, NumberOfObjectsErr.Error())
-			return NumberOfObjectsErr.Error(), NumberOfObjectsErr
 		}
 		// Get the BucketSizeBytes metric for the bucket
 		BucketSizeBytesErr := collectCloudwatchMetric(metricNameSizeBytes, unitBytes, storageTypeStandard, bucket, ctx, &meter, cw)
 		if BucketSizeBytesErr != nil {
 			fmt.Printf("Error while collecting BucketSizeBytes metric for bucket %s: %s", *bucket.Name, BucketSizeBytesErr.Error())
-			return BucketSizeBytesErr.Error(), BucketSizeBytesErr
 		}
 	}
 	return "Success", nil
@@ -128,36 +126,47 @@ func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 
 // collectCloudwatchMetric Collects a Cloudwatch metric for a given bucket and metric name
 func collectCloudwatchMetric(name string, unit string, storageType string, bucket *s3.Bucket, ctx context.Context, meter *metric.Meter, cw *cloudwatch.CloudWatch) error {
-	// Get the NumberOfObjects metric for the bucket
-	cloudwatchMetric, err := cw.GetMetricData(&cloudwatch.GetMetricDataInput{
-		MetricDataQueries: []*cloudwatch.MetricDataQuery{
-			{
-				Id: aws.String("m1"),
-				MetricStat: &cloudwatch.MetricStat{
-					Metric: &cloudwatch.Metric{
-						Namespace:  aws.String("AWS/S3"),
-						MetricName: aws.String(name),
-						Dimensions: []*cloudwatch.Dimension{
-							{
-								Name:  aws.String("BucketName"),
-								Value: aws.String(*bucket.Name),
-							},
-							{
-								Name:  aws.String("StorageType"),
-								Value: aws.String(storageType),
+	var cloudwatchMetric *cloudwatch.GetMetricDataOutput
+	var err error
+	var backoff = 1
+	// retry logic
+	for i := 0; i < 3; i++ {
+		cloudwatchMetric, err = cw.GetMetricData(&cloudwatch.GetMetricDataInput{
+			MetricDataQueries: []*cloudwatch.MetricDataQuery{
+				{
+					Id: aws.String(name + "-metric"),
+					MetricStat: &cloudwatch.MetricStat{
+						Metric: &cloudwatch.Metric{
+							Namespace:  aws.String("AWS/S3"),
+							MetricName: aws.String(name),
+							Dimensions: []*cloudwatch.Dimension{
+								{
+									Name:  aws.String("BucketName"),
+									Value: aws.String(*bucket.Name),
+								},
+								{
+									Name:  aws.String("StorageType"),
+									Value: aws.String(storageType),
+								},
 							},
 						},
+						Period: aws.Int64(86400),
+						Stat:   aws.String("Maximum"),
+						Unit:   aws.String(unit),
 					},
-					Period: aws.Int64(86400),
-					Stat:   aws.String("Maximum"),
-					Unit:   aws.String(unit),
 				},
 			},
-		},
-		// Set the start time to 1 day ago
-		StartTime: aws.Time(time.Now().Add(-48 * time.Hour)),
-		EndTime:   aws.Time(time.Now()),
-	})
+			// Set the start time to 1 day ago
+			StartTime: aws.Time(time.Now().Add(-48 * time.Hour)),
+			EndTime:   aws.Time(time.Now()),
+		})
+		if err == nil {
+			break
+		}
+		// wait before retrying (exponential backoff)
+		time.Sleep(time.Duration(backoff) * time.Second)
+		backoff = backoff * 2
+	}
 	if err != nil {
 		return err
 	}
