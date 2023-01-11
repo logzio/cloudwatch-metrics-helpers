@@ -165,11 +165,13 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 		if err == nil {
 			break
 		}
+		fmt.Printf("Error while performing GetMetricData api call for bucket %s. Trying again in %v seconds. Error: %s", *bucket.Name, backoff, err.Error())
 		// wait before retrying (exponential backoff)
 		time.Sleep(time.Duration(backoff) * time.Second)
 		backoff = backoff * 2
 	}
 	if err != nil {
+		fmt.Printf("GetMetricData api call for bucket %s failed after 3 attempts. Error: %s", *bucket.Name, err.Error())
 		return err
 	}
 	if len(cloudwatchMetric.MetricDataResults) > 0 {
