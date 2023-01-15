@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"log"
 	"os"
@@ -22,6 +23,13 @@ const (
 
 	emptyString   = ""
 	listSeparator = ","
+
+	paramLogzioMetricsListener = "logzioListener"
+	paramLogzioMetricsToken    = "logzioToken"
+	envLogzioMetricsListener   = "LOGZIO_METRICS_LISTENER"
+	envLogzioMetricsToken      = "LOGZIO_METRICS_TOKEN"
+	envStackName               = "STACK_NAME"
+	version                    = "latest"
 )
 
 var logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
@@ -64,15 +72,16 @@ func customResourceRun(ctx context.Context, event cfn.Event) (physicalResourceID
 	return
 }
 
-func run() (err error) {
+func run() error {
+	DeployS3Function := false
 	awsNs, err := getAwsNamespaces()
 	if err != nil {
-		return
+		return err
 	}
 
-	sess, err := getSession()
-	if err != nil {
-		return
+	sess, sessErr := getSession()
+	if sessErr != nil {
+		return sessErr
 	}
 
 	client := cloudwatch.New(sess)
@@ -86,6 +95,9 @@ func run() (err error) {
 		filter.Namespace = new(string)
 		*filter.Namespace = namespace
 		filters = append(filters, filter)
+		if namespace == nsS3 {
+			DeployS3Function = true
+		}
 	}
 
 	log.Printf("Filters to add: %v", filters)
@@ -100,12 +112,57 @@ func run() (err error) {
 
 	if err != nil {
 		logger.Println(err.Error())
-		return
+		return err
 	}
 
 	logger.Println(putFilterOutput.String())
 
-	return
+	// deploy s3 function if needed
+	if DeployS3Function {
+		log.Printf("Deploying S3 function")
+		cloudformationClient := cloudformation.New(sess)
+		listener, getListenerErr := getListener()
+		if getListenerErr != nil {
+			return fmt.Errorf("error while getting logzio listener address: %s", getListenerErr.Error())
+		}
+		token, tokenErr := getLogzioToken()
+		if tokenErr != nil {
+			return fmt.Errorf("error while getting logzio token: %s", tokenErr.Error())
+		}
+		currentStack, stackErr := getStackName()
+		if stackErr != nil {
+			return fmt.Errorf("error while getting stack name: %s", stackErr.Error())
+		}
+		params := []*cloudformation.Parameter{
+			{
+				ParameterKey:   aws.String(paramLogzioMetricsListener),
+				ParameterValue: aws.String(listener),
+			},
+			{
+				ParameterKey:   aws.String(paramLogzioMetricsToken),
+				ParameterValue: aws.String(token),
+			},
+		}
+		stackName := fmt.Sprintf("%v-s3", currentStack)
+		templateUrl := fmt.Sprintf("https://logzio-aws-integrations-%v.s3.amazonaws.com/metric-stream-helpers/aws/%v/sam-s3-daily-metrics.yaml", os.Getenv(envAwsRegion), version)
+		// Create a new CloudFormation stack
+		_, cfErr := cloudformationClient.CreateStack(&cloudformation.CreateStackInput{
+			StackName:   aws.String(stackName),
+			TemplateURL: aws.String(templateUrl),
+			Parameters:  params,
+			Capabilities: []*string{
+				aws.String(cloudformation.CapabilityCapabilityAutoExpand),
+				aws.String(cloudformation.CapabilityCapabilityIam),
+				aws.String(cloudformation.CapabilityCapabilityNamedIam),
+			},
+		})
+		if cfErr != nil {
+			logger.Printf("Error while creating stack: %s", cfErr.Error())
+			return err
+		}
+		logger.Printf("Stack %v created successfully", stackName)
+	}
+	return nil
 }
 
 func getSession() (*session.Session, error) {
@@ -139,4 +196,34 @@ func getAwsNamespaces() ([]string, error) {
 	}
 	logger.Printf("detected the following services: %v", ns)
 	return ns, nil
+}
+
+// getListener Gets the listener from the environment variables
+func getListener() (string, error) {
+	listener := os.Getenv(envLogzioMetricsListener)
+	if listener == "" {
+		return "", fmt.Errorf("%s must be set", envLogzioMetricsListener)
+	}
+
+	return listener, nil
+}
+
+// getLogzioToken Gets the Logz.io token from the environment variables
+func getLogzioToken() (string, error) {
+	listener := os.Getenv(envLogzioMetricsToken)
+	if listener == "" {
+		return "", fmt.Errorf("%s must be set", envLogzioMetricsToken)
+	}
+
+	return listener, nil
+}
+
+// getStackName gets the name of the cfn stack from environment variables
+func getStackName() (string, error) {
+	stackName := os.Getenv(envStackName)
+	if stackName == "" {
+		return "", fmt.Errorf("%s must be set", envStackName)
+	}
+
+	return stackName, nil
 }

@@ -15,6 +15,7 @@ ENV_FOLDER_NAME = 'FOLDER_NAME'
 ENV_VERSION_NUMBER = 'VERSION_NUMBER'
 ENV_PATH_TO_FILE = 'PATH_TO_FILE'
 CF_TEMPLATE = 'sam-template.yaml'
+CF_TEMPLATE_S3 = 'sam-s3-daily-metrics.yaml'
 REGION_PLACEHOLDER = '<<REGION>>'
 VERSION_PLACEHOLDER = '<<VERSION>>'
 
@@ -51,6 +52,7 @@ def cf_template_workflow(access_key, secret_key, folder_name, version_number, pa
     for region in REGIONS:
         try:
             print(f'Region: {region}')
+            print(f'Version: {version_number}')
             tmp_arr = []
             for line in base_arr:
                 tmp_line = line.replace(REGION_PLACEHOLDER, region)
@@ -98,7 +100,8 @@ def upload():
     if not file_exists:
         raise FileNotFoundError(f'Provided path to file ({path_to_file}) does not exists! Exiting')
     try:
-        is_cf_template = path_to_file.split('/')[-1] == CF_TEMPLATE
+        is_cf_template = (path_to_file.split('/')[-1] == CF_TEMPLATE or path_to_file.split('/')[-1] == CF_TEMPLATE_S3)
+        print(f'Is Cloudformation template: {is_cf_template}')
         if is_cf_template:
             cf_template_workflow(access_key, secret_key, folder_name, version_number, path_to_file)
         else:
