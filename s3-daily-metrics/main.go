@@ -145,7 +145,7 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 		cloudwatchMetric, err = cw.GetMetricData(&cloudwatch.GetMetricDataInput{
 			MetricDataQueries: []*cloudwatch.MetricDataQuery{
 				{
-					Id: aws.String(name + "-metric"),
+					Id: aws.String("m1"),
 					MetricStat: &cloudwatch.MetricStat{
 						Metric: &cloudwatch.Metric{
 							Namespace:  aws.String("AWS/S3"),
