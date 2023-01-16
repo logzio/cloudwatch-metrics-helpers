@@ -50,7 +50,10 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 
 ## Changelog:
-
+- **1.2.2**
+  - Add `s3 metrics collector` function
+  - Updated aws cloudformation templates
+  - Added `s3 metrics collector` deployment logic to `namespaces function`
 - **1.2.1**:
   - Template - rename field to avoid warning upon deployment.
 - **1.2.0**:
