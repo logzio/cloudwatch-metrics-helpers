@@ -50,6 +50,8 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 
 ## Changelog:
+- **1.2.3**
+  - Remove 3 logzio destinations from Cloudformation template.
 - **1.2.2**
   - Add `s3 metrics collector` function
   - Updated aws cloudformation templates
