@@ -188,14 +188,20 @@ func getAwsNamespaces() ([]string, error) {
 		return nil, fmt.Errorf("either %s or %s must be set", envAwsNamespaces, envCustomNamespace)
 	}
 
-	fullNsStr := awsNsStr
+	// Create a slice to hold the namespaces
+	var namespaces []string
+
+	// Add awsNsStr and customNs to the slice if they are not empty
+	if awsNsStr != emptyString {
+		namespaces = append(namespaces, awsNsStr)
+	}
 	if customNs != emptyString {
-		if fullNsStr != emptyString {
-			fullNsStr += listSeparator
-		}
-		fullNsStr += customNs
+		namespaces = append(namespaces, customNs)
 	}
 
+	// Join namespace strings with the list separator
+	fullNsStr := strings.Join(namespaces, listSeparator)
+	// Remove all spaces from the final namespace string
 	fullNsStr = strings.ReplaceAll(fullNsStr, " ", "")
 
 	ns := strings.Split(fullNsStr, listSeparator)
