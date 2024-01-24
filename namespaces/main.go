@@ -15,11 +15,12 @@ import (
 )
 
 const (
-	envAwsRegion     = "AWS_REGION" // reserved env
-	envAwsNamespaces = "AWS_NAMESPACES"
-	envStreamName    = "METRIC_STREAM_NAME"
-	envFirehoseArn   = "FIREHOSE_ARN"
-	envRoleArn       = "METRIC_STREAM_ROLE_ARN"
+	envAwsRegion       = "AWS_REGION" // reserved env
+	envAwsNamespaces   = "AWS_NAMESPACES"
+	envCustomNamespace = "CUSTOM_NAMESPACE"
+	envStreamName      = "METRIC_STREAM_NAME"
+	envFirehoseArn     = "FIREHOSE_ARN"
+	envRoleArn         = "METRIC_STREAM_ROLE_ARN"
 
 	emptyString   = ""
 	listSeparator = ","
@@ -180,14 +181,24 @@ func getSession() (*session.Session, error) {
 }
 
 func getAwsNamespaces() ([]string, error) {
-	nsStr := os.Getenv(envAwsNamespaces)
-	if nsStr == emptyString {
-		return nil, fmt.Errorf("env %s must be set", envAwsNamespaces)
+	awsNsStr := os.Getenv(envAwsNamespaces)
+	customNs := os.Getenv(envCustomNamespace)
+
+	if awsNsStr == emptyString && customNs == emptyString {
+		return nil, fmt.Errorf("either %s or %s must be set", envAwsNamespaces, envCustomNamespace)
 	}
 
-	nsStr = strings.ReplaceAll(nsStr, " ", "")
+	fullNsStr := awsNsStr
+	if customNs != emptyString {
+		if fullNsStr != emptyString {
+			fullNsStr += listSeparator
+		}
+		fullNsStr += customNs
+	}
 
-	ns := strings.Split(nsStr, listSeparator)
+	fullNsStr = strings.ReplaceAll(fullNsStr, " ", "")
+
+	ns := strings.Split(fullNsStr, listSeparator)
 	for _, namespace := range ns {
 		if namespace == nsAll {
 			logger.Println("detected ALL namespaces")
