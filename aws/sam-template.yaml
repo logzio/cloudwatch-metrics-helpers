@@ -384,3 +384,4 @@ Outputs:
       Fn::If:
         - BothNamespacesEmpty
         - "Both awsNamespaces and customNamespace are empty. No resources created. Please delete current stack."
+        - "At least one namespace is defined. Resources may have been created."
