@@ -29,7 +29,9 @@ Parameters:
   awsNamespaces:
     Type: String
     Description: 'The AWS namespaces you want to collect metrics from'
-    MinLength: 1
+  customNamespace:
+    Type: String
+    Description: 'A custom namespace for CloudWatch metrics'
   httpEndpointDestinationIntervalInSeconds:
     Type: Number
     Description: 'The length of time, in seconds, that Kinesis Data Firehose buffers incoming data before delivering it to the destination'
@@ -38,23 +40,34 @@ Parameters:
     Type: Number
     Description: 'The size of the buffer, in MBs, that Kinesis Data Firehose uses for incoming data before delivering it to the destination'
     Default: 5
+Conditions:
+  AtLeastOneNamespaceDefined: !Or
+    - !Not [!Equals [!Ref awsNamespaces, ""]]
+    - !Not [!Equals [!Ref customNamespace, ""]]
+  BothNamespacesEmpty: !And
+    - !Equals [ !Ref awsNamespaces, "" ]
+    - !Equals [ !Ref customNamespace, "" ]
 Resources:
   logzioS3BackupBucket:
     Type: AWS::S3::Bucket
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       BucketName: !Join ['-', ['logzio-metric-stream-backup', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
   logzioFirehoseLogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       LogGroupName: !Join ['-', ['logzio-metric-stream-firehose', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
   logzioLogStream:
     DependsOn: logzioFirehoseLogGroup
     Type: AWS::Logs::LogStream
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       LogGroupName: !Ref logzioFirehoseLogGroup
       LogStreamName: !Join ['-', ['logzio-metric-stream-firehose', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
   logzioS3DestinationFirehoseRole:
     Type: 'AWS::IAM::Role'
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       RoleName: !Join ['-', ['LogzioS3DestFirehoseRole', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
       AssumeRolePolicyDocument:
@@ -97,6 +110,7 @@ Resources:
                       NewLogStreamName: !Ref logzioLogStream
   logzioFirehoseLoggingRole:
     Type: 'AWS::IAM::Role'
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       RoleName: !Join [ '-', [ 'LogzioFirehoseLoggingRole', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
       AssumeRolePolicyDocument:
@@ -125,6 +139,7 @@ Resources:
   logzioDeliveryStream:
     DependsOn: logzioS3BackupBucket
     Type: AWS::KinesisFirehose::DeliveryStream
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       DeliveryStreamName: !Join ['-', ['LogzioDeliveryStream', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
       DeliveryStreamType: DirectPut
@@ -150,6 +165,7 @@ Resources:
 
   logzioMetricStreamRole:
     Type: 'AWS::IAM::Role'
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       RoleName: !Join ['-', ['LogzioMetricStreamRole', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
       AssumeRolePolicyDocument:
@@ -177,6 +193,7 @@ Resources:
                     - DeliveryStreamName: !Ref logzioDeliveryStream
   logzioMetricStream:
     Type: AWS::CloudWatch::MetricStream
+    Condition: AtLeastOneNamespaceDefined
     DependsOn:
       - logzioDeliveryStream
       - logzioMetricStreamRole
@@ -187,6 +204,7 @@ Resources:
       RoleArn: !GetAtt logzioMetricStreamRole.Arn
   logzioMetricStreamAddNamespacesLambda:
     Type: 'AWS::Lambda::Function'
+    Condition: AtLeastOneNamespaceDefined
     DependsOn: logzioMetricStream
     Properties:
       Code:
@@ -204,18 +222,21 @@ Resources:
           LOGZIO_METRICS_LISTENER: !Ref logzioListener
           LOGZIO_METRICS_TOKEN: !Ref logzioToken
           AWS_NAMESPACES: !Ref awsNamespaces
+          CUSTOM_NAMESPACE: !Ref customNamespace
           METRIC_STREAM_NAME: !Ref logzioMetricStream
           FIREHOSE_ARN: !GetAtt logzioDeliveryStream.Arn
           METRIC_STREAM_ROLE_ARN: !GetAtt logzioMetricStreamRole.Arn
           STACK_NAME: !Ref AWS::StackName
   logzioNamespacesPrimerInvoke:
     Type: AWS::CloudFormation::CustomResource
+    Condition: AtLeastOneNamespaceDefined
     DependsOn: logzioMetricStreamAddNamespacesLambda
     Version: '1.0'
     Properties:
       ServiceToken: !GetAtt logzioMetricStreamAddNamespacesLambda.Arn
   logzioNamespacesLambdaRole:
     Type: 'AWS::IAM::Role'
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       RoleName: !Join ['-', ['LogzioMetricStreamNamespacesLambdaRole', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
       AssumeRolePolicyDocument:
@@ -289,11 +310,12 @@ Resources:
 
   logzioMetricStreamAddTagsLambda:
     Type: 'AWS::Lambda::Function'
+    Condition: AtLeastOneNamespaceDefined
     DependsOn: logzioMetricStream
     Properties:
       Code:
         S3Bucket: logzio-aws-integrations-<<REGION>>
-        S3Key: metric-stream-helpers/tags/<<VERSION>>/function.zip
+        S3Key: metric-stream-helpers/namespaces/<<VERSION>>/function.zip
       FunctionName: !Join [ '-', [ !Ref AWS::StackName, 'tags-func' ] ]
       Handler: main
       Runtime: go1.x
@@ -307,6 +329,7 @@ Resources:
           LOGZIO_METRICS_TOKEN: !Ref logzioToken
   logzioTagsLambdaRole:
     Type: 'AWS::IAM::Role'
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       RoleName: !Join [ '-', [ 'LogzioMetricStreamTagsLambdaRole', !Select [ 4, !Split [ '-', !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ] ] ] ] ]
       AssumeRolePolicyDocument:
@@ -337,6 +360,7 @@ Resources:
   logzioMetricStreamTagsLambdaTrigger:
     DependsOn: logzioMetricStreamAddTagsLambda
     Type: AWS::Events::Rule
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       Description: 'This event is a cron job that triggeres every 5 minutes the Logz.io metric stream tags Lambda function.'
       ScheduleExpression: rate(5 minutes)
@@ -347,8 +371,17 @@ Resources:
           Id: 'LogzioMetricStreamAddTagsLambda'
   logzioMetricStreamTagsLambdaPermission:
     Type: AWS::Lambda::Permission
+    Condition: AtLeastOneNamespaceDefined
     Properties:
       FunctionName: !Ref logzioMetricStreamAddTagsLambda
       Action: 'lambda:InvokeFunction'
       Principal: 'events.amazonaws.com'
       SourceArn: !GetAtt logzioMetricStreamTagsLambdaTrigger.Arn
+Outputs:
+  NamespaceStatus:
+    Description: "Status of Namespace Parameters"
+    Value:
+      Fn::If:
+        - BothNamespacesEmpty
+        - "Both awsNamespaces and customNamespace are empty. No resources created. Please delete current stack."
+        - "At least one namespace is defined. Resources may have been created."

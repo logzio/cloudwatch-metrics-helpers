@@ -15,11 +15,12 @@ import (
 )
 
 const (
-	envAwsRegion     = "AWS_REGION" // reserved env
-	envAwsNamespaces = "AWS_NAMESPACES"
-	envStreamName    = "METRIC_STREAM_NAME"
-	envFirehoseArn   = "FIREHOSE_ARN"
-	envRoleArn       = "METRIC_STREAM_ROLE_ARN"
+	envAwsRegion       = "AWS_REGION" // reserved env
+	envAwsNamespaces   = "AWS_NAMESPACES"
+	envCustomNamespace = "CUSTOM_NAMESPACE"
+	envStreamName      = "METRIC_STREAM_NAME"
+	envFirehoseArn     = "FIREHOSE_ARN"
+	envRoleArn         = "METRIC_STREAM_ROLE_ARN"
 
 	emptyString   = ""
 	listSeparator = ","
@@ -180,14 +181,30 @@ func getSession() (*session.Session, error) {
 }
 
 func getAwsNamespaces() ([]string, error) {
-	nsStr := os.Getenv(envAwsNamespaces)
-	if nsStr == emptyString {
-		return nil, fmt.Errorf("env %s must be set", envAwsNamespaces)
+	awsNsStr := os.Getenv(envAwsNamespaces)
+	customNs := os.Getenv(envCustomNamespace)
+
+	if awsNsStr == emptyString && customNs == emptyString {
+		return nil, fmt.Errorf("either %s or %s must be set", envAwsNamespaces, envCustomNamespace)
 	}
 
-	nsStr = strings.ReplaceAll(nsStr, " ", "")
+	// Create a slice to hold the namespaces
+	var namespaces []string
 
-	ns := strings.Split(nsStr, listSeparator)
+	// Add awsNsStr and customNs to the slice if they are not empty
+	if awsNsStr != emptyString {
+		namespaces = append(namespaces, awsNsStr)
+	}
+	if customNs != emptyString {
+		namespaces = append(namespaces, customNs)
+	}
+
+	// Join namespace strings with the list separator
+	fullNsStr := strings.Join(namespaces, listSeparator)
+	// Remove all spaces from the final namespace string
+	fullNsStr = strings.ReplaceAll(fullNsStr, " ", "")
+
+	ns := strings.Split(fullNsStr, listSeparator)
 	for _, namespace := range ns {
 		if namespace == nsAll {
 			logger.Println("detected ALL namespaces")
