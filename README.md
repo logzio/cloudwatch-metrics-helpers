@@ -51,6 +51,8 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 
 ## Changelog:
+- **1.3.1**
+  - Support collecting tags of `DBInstanceIdentifier` tagged metrics. 
 - **1.3.0**
   - Added the functionality of `customNamespace` to specify a unique namespace. 
 - **1.2.4**
