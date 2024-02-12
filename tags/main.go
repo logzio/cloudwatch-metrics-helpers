@@ -37,7 +37,6 @@ func main() {
 }
 
 func HandleRequest(ctx context.Context) error {
-	logger.Println("Starting to collect tags")
 	services, client, exporter, err := initialize()
 	if err != nil {
 		return err
@@ -202,7 +201,6 @@ func sendTags(ctx context.Context, resources []*resourcegroupstaggingapi.Resourc
 				Key:   attribute.Key(*tag.Key),
 				Value: attribute.StringValue(*tag.Value),
 			})
-			logger.Println("current attributes: ", attributes)
 		}
 
 		idLabels := addIdentifier(*resource.ResourceARN)
@@ -215,17 +213,14 @@ func sendTags(ctx context.Context, resources []*resourcegroupstaggingapi.Resourc
 			attributes = append(attributes, idLabels...)
 		}
 
-		logger.Println("current attributes 2: ", attributes)
-
 		attributes = append(attributes, attribute.KeyValue{
 			Key:   fieldLogzioAgentVersion,
 			Value: attribute.StringValue(os.Getenv(envAwsLambdaFunctionVersion)),
 		})
 
-		logger.Println("current attributes 3: ", attributes)
-
 		counter.Add(ctx, int64(1), attributes...)
 	}
+
 }
 
 func addIdentifier(resourceArn string) []attribute.KeyValue {

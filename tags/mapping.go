@@ -320,7 +320,7 @@ func getArnRegexToIdsMap() map[string][]string {
 		arnRegAppStream:            {"Fleet"},
 		arnRegAppSync:              {"GraphQLAPIId"},
 		arnRegAthena:               {"WorkGroup"},
-		arnRegRds:                  {"DBClusterIdentifier"},
+		arnRegRds:                  {"DBClusterIdentifier", "DBInstanceIdentifier"},
 		arnRegBackup:               {"BackupVaultName"},
 		arnRegAcm:                  {"CertificateArn"},
 		arnRegAcmPca:               {"PrivateCAArn"},
