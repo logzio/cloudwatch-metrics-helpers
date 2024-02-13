@@ -315,7 +315,7 @@ Resources:
     Properties:
       Code:
         S3Bucket: logzio-aws-integrations-<<REGION>>
-        S3Key: metric-stream-helpers/namespaces/<<VERSION>>/function.zip
+        S3Key: metric-stream-helpers/tags/<<VERSION>>/function.zip
       FunctionName: !Join [ '-', [ !Ref AWS::StackName, 'tags-func' ] ]
       Handler: main
       Runtime: go1.x
