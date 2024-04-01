@@ -59,7 +59,7 @@ def cf_template_workflow(access_key, secret_key, folder_name, version_number, pa
             print(f'Version: {version_number}')
             # Adjust the template content for each region
             tmp_arr = [line.replace(REGION_PLACEHOLDER, region).replace(VERSION_PLACEHOLDER, version_number) for line in base_arr]
-            new_path = f'./{file_name}_{region}' 
+            new_path = f'./{file_name}' 
             with open(new_path, 'w') as new_file:
                 new_file.writelines(tmp_arr)
             object_name = f'{folder_name}/{version_number}/{file_name}'
