@@ -8,7 +8,8 @@ REGIONS = [
     'eu-central-1', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-north-1',
     'sa-east-1',
     'ca-central-1',
-    'eu-central-2', 'eu-south-1', 'eu-south-2', 'ap-south-2', 'ap-southeast-3', 'ap-southeast-4', 'ap-east-1', 'ca-west-1', 'af-south-1', 'me-central-1', 'il-central-1'
+    'eu-central-2', 'eu-south-1', 'eu-south-2', 'ap-south-2', 'ap-southeast-3', 'ap-southeast-4', 'ap-east-1', 'ca-west-1', 'af-south-1', 'me-central-1', 
+    'il-central-1','me-south-1'
 ]
 
 BUCKET_NAME_PREFIX = 'logzio-aws-integrations-'
@@ -24,13 +25,14 @@ VERSION_PLACEHOLDER = '<<VERSION>>'
 
 
 def upload_public_to_s3(access_key, secret_key, folder_name, version_number, path_to_file):
-    s3 = get_s3_client(access_key, secret_key)
     file_name = path_to_file.split('/')[-1]
     print(f'File name: {file_name}')
     success = 0
     for region in REGIONS:
         try:
             print(f'Region: {region}')
+            # Create a new S3 client for each region
+            s3 = get_s3_client(access_key, secret_key, region)
             object_name = f'{folder_name}/{version_number}/{file_name}'
             bucket_name = f'{BUCKET_NAME_PREFIX}{region}'
             s3.upload_file(path_to_file, bucket_name, object_name, ExtraArgs={'ACL': 'public-read'})
@@ -43,7 +45,6 @@ def upload_public_to_s3(access_key, secret_key, folder_name, version_number, pat
 
 
 def cf_template_workflow(access_key, secret_key, folder_name, version_number, path_to_file):
-    s3 = get_s3_client(access_key, secret_key)
     file_name = path_to_file.split('/')[-1]
     print(f'File name: {file_name}')
     success = 0
@@ -56,30 +57,29 @@ def cf_template_workflow(access_key, secret_key, folder_name, version_number, pa
         try:
             print(f'Region: {region}')
             print(f'Version: {version_number}')
-            tmp_arr = []
-            for line in base_arr:
-                tmp_line = line.replace(REGION_PLACEHOLDER, region)
-                tmp_line = tmp_line.replace(VERSION_PLACEHOLDER, version_number)
-                tmp_arr.append(tmp_line)
-            new_path = f'./{file_name}'
+            # Adjust the template content for each region
+            tmp_arr = [line.replace(REGION_PLACEHOLDER, region).replace(VERSION_PLACEHOLDER, version_number) for line in base_arr]
+            new_path = f'./{file_name}' 
             with open(new_path, 'w') as new_file:
                 new_file.writelines(tmp_arr)
             object_name = f'{folder_name}/{version_number}/{file_name}'
             bucket_name = f'{BUCKET_NAME_PREFIX}{region}'
+            # Create a new S3 client for the current region
+            s3 = get_s3_client(access_key, secret_key, region)
             s3.upload_file(new_path, bucket_name, object_name, ExtraArgs={'ACL': 'public-read'})
             success += 1
+            os.remove(new_path)  # Clean up the locally created file
         except Exception as e:
             print(f'Error occurred for region {region}: {e}')
             print('Skipping this region')
 
     print(f'Uploaded to {success} regions')
-    os.remove(new_path)
 
-
-def get_s3_client(access_key, secret_key):
+def get_s3_client(access_key, secret_key, region_name):
     session = boto3.Session(
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
+        region_name=region_name
     )
 
     return session.client('s3')
