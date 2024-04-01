@@ -3,12 +3,12 @@ import os
 import boto3
 
 REGIONS = [
-    # 'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
-    # 'ap-south-1', 'ap-northeast-3', 'ap-northeast-2', 'ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1',
-    # 'eu-central-1', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-north-1',
-    # 'sa-east-1',
+    'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
+    'ap-south-1', 'ap-northeast-3', 'ap-northeast-2', 'ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1',
+    'eu-central-1', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-north-1',
+    'sa-east-1',
     'ca-central-1',
-    # 'eu-central-2', 'eu-south-1', 'eu-south-2', 'ap-south-2', 'ap-southeast-3', 'ap-southeast-4', 'ap-east-1', 'ca-west-1', 'af-south-1', 'me-central-1', 
+    'eu-central-2', 'eu-south-1', 'eu-south-2', 'ap-south-2', 'ap-southeast-3', 'ap-southeast-4', 'ap-east-1', 'ca-west-1', 'af-south-1', 'me-central-1', 
     'il-central-1','me-south-1'
 ]
 
@@ -74,8 +74,6 @@ def cf_template_workflow(access_key, secret_key, folder_name, version_number, pa
             print('Skipping this region')
 
     print(f'Uploaded to {success} regions')
-    os.remove(new_path)
-
 
 def get_s3_client(access_key, secret_key, region_name):
     session = boto3.Session(
