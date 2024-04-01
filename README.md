@@ -65,7 +65,8 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 ## Changelog:
 - **1.3.3**
-  - Updates the REGIONS list to include additional AWS regions.
+  - Expanded the REGIONS list with new AWS regions.
+  - Enhanced the script for better AWS multi-region support by implementing region-specific S3 client usage.
 - **1.3.2**
   - Upgrade the runtime from Go 1.x to the provided Amazon Linux 2023.
 - **1.3.1**
