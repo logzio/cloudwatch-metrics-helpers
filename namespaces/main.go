@@ -69,7 +69,7 @@ func HandleRequest(ctx context.Context, event cfn.Event) (physicalResourceID str
 
 // Wrapper for Read, Update, Delete requests
 func customResourceDoNothing(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
-	debugLog("Executing 'Do Nothing' operation for request: %+v", event)
+	debugLog("Since the request type is not 'Create', no further action will be taken for this event: %+v", event)
 	return generatePhysicalResourceId(event), nil, nil
 }
 
@@ -91,7 +91,7 @@ func customResourceRun(ctx context.Context, event cfn.Event) (physicalResourceID
 }
 
 func run() error {
-	debugLog("Beginning main logic execution for the custom resource deployment.")
+	debugLog("Starting main logic execution for the custom resource deployment.")
 	DeployS3Function := false
 	awsNs, err := getAwsNamespaces()
 	if err != nil {
@@ -219,9 +219,11 @@ func getAwsNamespaces() ([]string, error) {
 	// Add awsNsStr and customNs to the slice if they are not empty
 	if awsNsStr != emptyString {
 		namespaces = append(namespaces, awsNsStr)
+		debugLog("Appending AWS namespace string to namespaces: %s", awsNsStr)
 	}
 	if customNs != emptyString {
 		namespaces = append(namespaces, customNs)
+		debugLog("Appending custom namespace string to namespaces: %s", customNs)
 	}
 
 	// Join namespace strings with the list separator

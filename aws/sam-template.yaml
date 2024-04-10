@@ -40,7 +40,7 @@ Parameters:
     Type: Number
     Description: 'The size of the buffer, in MBs, that Kinesis Data Firehose uses for incoming data before delivering it to the destination'
     Default: 5
-  DebugMode:
+  debugMode:
     Type: String
     Description: 'Enable debug mode for detailed logging (true/false)'
     Default: 'false'
@@ -234,7 +234,7 @@ Resources:
           FIREHOSE_ARN: !GetAtt logzioDeliveryStream.Arn
           METRIC_STREAM_ROLE_ARN: !GetAtt logzioMetricStreamRole.Arn
           STACK_NAME: !Ref AWS::StackName
-          DEBUG_MODE: !Ref DebugMode
+          DEBUG_MODE: !Ref debugMode
   logzioNamespacesPrimerInvoke:
     Type: AWS::CloudFormation::CustomResource
     Condition: AtLeastOneNamespaceDefined
@@ -335,7 +335,7 @@ Resources:
           AWS_NAMESPACES: !Ref awsNamespaces
           LOGZIO_METRICS_LISTENER: !Ref logzioListener
           LOGZIO_METRICS_TOKEN: !Ref logzioToken
-          DEBUG_MODE: !Ref DebugMode
+          DEBUG_MODE: !Ref debugMode
   logzioTagsLambdaRole:
     Type: 'AWS::IAM::Role'
     Condition: AtLeastOneNamespaceDefined
