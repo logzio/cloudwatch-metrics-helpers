@@ -24,6 +24,7 @@ const (
 	envLogzioMetricsListener    = "LOGZIO_METRICS_LISTENER"
 	envLogzioMetricsToken       = "LOGZIO_METRICS_TOKEN"
 	envAwsLambdaFunctionVersion = "AWS_LAMBDA_FUNCTION_VERSION" // reserved env
+	envDebugMode                = "DEBUG_MODE"                  // Added debug mode environment variable
 
 	emptyString             = ""
 	listSeparator           = ","
@@ -32,17 +33,27 @@ const (
 
 var logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
 
+func debugLog(format string, v ...interface{}) {
+	if strings.ToLower(os.Getenv(envDebugMode)) == "true" {
+		logger.Printf(format, v...)
+	}
+}
+
 func main() {
 	lambda.Start(HandleRequest)
 }
 
 func HandleRequest(ctx context.Context) error {
+	debugLog("Debug mode enabled: Starting Lambda function execution.")
+
 	services, client, exporter, err := initialize()
 	if err != nil {
+		logger.Printf("Error in initialize: %s", err)
 		return err
 	}
 
 	defer func() {
+		debugLog("Stopping metrics exporter and finalizing function execution.")
 		handleErr(exporter.Stop(ctx))
 	}()
 	meter := exporter.Meter("aws_resource_info")
@@ -53,6 +64,8 @@ func HandleRequest(ctx context.Context) error {
 	resourcesPerPage := int64(100)
 	callsCounter := 0
 	for {
+		debugLog("Fetching resources from AWS Resource Groups Tagging API, call number: %d", callsCounter+1)
+
 		input := resourcegroupstaggingapi.GetResourcesInput{
 			PaginationToken:     nextToken,
 			ResourceTypeFilters: services,
@@ -63,6 +76,7 @@ func HandleRequest(ctx context.Context) error {
 		callsCounter += 1
 
 		if err != nil {
+			logger.Printf("Error fetching resources: %s", err)
 			return fmt.Errorf("error occurred while trying to get resources: %s", err.Error())
 		}
 
@@ -76,7 +90,7 @@ func HandleRequest(ctx context.Context) error {
 		}
 	}
 
-	logger.Println("finished lambda run")
+	logger.Printf("Finished lambda run after %d API calls", callsCounter)
 	return nil
 }
 
@@ -115,6 +129,7 @@ func getSession() (*session.Session, error) {
 }
 
 func initialize() ([]*string, *resourcegroupstaggingapi.ResourceGroupsTaggingAPI, *basic.Controller, error) {
+	debugLog("Initializing AWS session, metrics exporter, and resource group tagging API client.")
 	namespaces, err := getAwsNamespaces()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not retrieve namespaces: %s. Aborting", err.Error())
