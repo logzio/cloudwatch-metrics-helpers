@@ -15,6 +15,8 @@ This Lambda collects tags from resources under selected AWS namespaces, and send
 
 #### Changelog:
 
+- **1.1.2**:
+  - Added debug mode support to aid in operational logging and diagnostics.
 - **1.1.1**:
   - Add label `logzio_agent_version` to metrics.
 - **1.1.0**:

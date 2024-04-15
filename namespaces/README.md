@@ -17,6 +17,9 @@ This lambda function is intended to run once at Cloudformation stack creation, a
 
 #### Changelog:
 
+- **1.2.1**:
+  - Added debug mode support for enhanced troubleshooting.
+  - Added generation and return of physicalResourceId for improved CloudFormation resource management.
 - **1.2.0**: Added the functionality of `CUSTOM_NAMESPACE` to specify a unique namespace.
 - **1.1.0**: Support adding all namespaces by setting `AWS_NAMESPACES` with `all-namespaces`.
 - **1.0.0**: Initial release.
