@@ -7,11 +7,11 @@ Parameters:
     Description: 'Your Logz.io destination'
     Default: 'https://listener-aws-metrics-stream-us.logz.io/v2/otlp'
     AllowedValues:
-      - 'https://listener-aws-metrics-stream-us.logz.io/v2/otlp'
-      - 'https://listener-aws-metrics-stream-eu.logz.io/v2/otlp'
-      - 'https://listener-aws-metrics-stream-au.logz.io/v2/otlp'
-      - 'https://listener-aws-metrics-stream-uk.logz.io/v2/otlp'
-      - 'https://listener-aws-metrics-stream-ca.logz.io/v2/otlp'
+      - 'https://listener-otlp-aws-metrics-stream-us.logz.io'
+      - 'https://listener-otlp-aws-metrics-stream-eu.logz.io'
+      - 'https://listener-otlp-aws-metrics-stream-au.logz.io'
+      - 'https://listener-otlp-aws-metrics-stream-uk.logz.io'
+      - 'https://listener-otlp-aws-metrics-stream-ca.logz.io'
   logzioToken:
     Type: String
     Description: 'Your Logz.io log shipping token'
@@ -47,6 +47,11 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
+  p8sLogzioName:
+    Type: String
+    Description: '`p8s_logzio_name` is a custom label added to all metrics from this integration.'
+    default: 'logzio-otlp-metrics-stream'
+    MinLength: 1
 Conditions:
   AtLeastOneNamespaceDefined: !Or
     - !Not [!Equals [!Ref awsNamespaces, ""]]
@@ -169,6 +174,10 @@ Resources:
           Enabled: true
           LogGroupName: !Ref logzioFirehoseLogGroup
           LogStreamName: !Ref logzioLogStream
+        RequestConfiguration:
+          CommonAttributes:
+            - AttributeName: 'P8S_LOGZIO_NAME'
+              AttributeValue: !Ref p8sLogzioName
 
   logzioMetricStreamRole:
     Type: 'AWS::IAM::Role'
