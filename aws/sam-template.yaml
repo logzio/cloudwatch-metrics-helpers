@@ -5,7 +5,7 @@ Parameters:
   logzioDestination:
     Type: String
     Description: 'Your Logz.io destination'
-    Default: 'https://listener-aws-metrics-stream-us.logz.io/v2/otlp'
+    Default: 'https://listener-otlp-aws-metrics-stream-us.logz.io'
     AllowedValues:
       - 'https://listener-otlp-aws-metrics-stream-us.logz.io'
       - 'https://listener-otlp-aws-metrics-stream-eu.logz.io'
@@ -50,8 +50,7 @@ Parameters:
   p8sLogzioName:
     Type: String
     Description: '`p8s_logzio_name` is a custom label added to all metrics from this integration.'
-    default: 'logzio-otlp-metrics-stream'
-    MinLength: 1
+    Default: 'logzio-otlp-metrics-stream'
 Conditions:
   AtLeastOneNamespaceDefined: !Or
     - !Not [!Equals [!Ref awsNamespaces, ""]]
