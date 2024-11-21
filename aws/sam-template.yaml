@@ -215,7 +215,7 @@ Resources:
     Properties:
       FirehoseArn: !GetAtt logzioDeliveryStream.Arn
       Name: !Join ['-', ['LogzioMetricStream', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
-      OutputFormat: 'opentelemetry1.0'
+      OutputFormat: opentelemetry1.0
       RoleArn: !GetAtt logzioMetricStreamRole.Arn
   logzioMetricStreamAddNamespacesLambda:
     Type: 'AWS::Lambda::Function'
