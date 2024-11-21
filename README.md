@@ -65,7 +65,9 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 
 ## Changelog:
-
+- **1.4.0**
+  - Added Support for otlp 1.0 protocol
+  - Support adding custom 'p8s_logzio_name` label
 - **1.3.4**
   - Added debug mode to namespaces and tags to provide detailed operational logs, facilitating easier debugging.
   - Added physicalResourceId in response, enhancing CloudFormation stack resource tracking.
