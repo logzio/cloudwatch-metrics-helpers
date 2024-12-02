@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"strings"
+
 	"github.com/aws/aws-lambda-go/cfn"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"log"
-	"os"
-	"strings"
 )
 
 const (
@@ -114,7 +115,7 @@ func run() error {
 
 	debugLog("Preparing to create CloudWatch metric stream with name: %s", streamName)
 
-	outputFormat := "opentelemetry0.7"
+	outputFormat := "opentelemetry1.0"
 	filters := make([]*cloudwatch.MetricStreamFilter, 0)
 	for _, namespace := range awsNs {
 		filter := &cloudwatch.MetricStreamFilter{Namespace: aws.String(namespace)}
