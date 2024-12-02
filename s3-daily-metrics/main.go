@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/aws/aws-lambda-go/cfn"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
@@ -13,9 +17,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric/controller/basic"
-	"os"
-	"strings"
-	"time"
 )
 
 const (
@@ -23,6 +24,7 @@ const (
 	envLogzioMetricsListener = "LOGZIO_METRICS_LISTENER"
 	// envLogzioMetricsToken The environment variable name for the Logz.io token
 	envLogzioMetricsToken = "LOGZIO_METRICS_TOKEN"
+	envP8slogzioName      = "P8S_LOGZIO_NAME"
 	// fieldLogzioAgentVersion The field name for the Logz.io agent version
 	fieldLogzioAgentVersion      = "logzio_agent_version"
 	fieldLogzioAgentVersionValue = "1.0.0"
@@ -218,9 +220,10 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 				Value: attribute.StringValue(fieldNameSpaceValue),
 			})
 			// Add p8s_logzio_name attribute
+			envTag := getEnvTag()
 			attributes = append(attributes, attribute.KeyValue{
 				Key:   fieldP8slogzioName,
-				Value: attribute.StringValue(fieldP8slogzioNameValue),
+				Value: attribute.StringValue(envTag),
 			})
 			// Add aws region attribute
 			attributes = append(attributes, attribute.KeyValue{
@@ -284,6 +287,14 @@ func getLogzioToken() (string, error) {
 	}
 
 	return listener, nil
+}
+
+func getEnvTag() string {
+	tag := os.Getenv(envP8slogzioName)
+	if tag == "" {
+		tag = fieldP8slogzioNameValue
+	}
+	return tag
 }
 
 // handleErr Handles defer errors
