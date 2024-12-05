@@ -14,6 +14,7 @@ Before you can use this program, you will need to do the following:
 
 - `LOGZIO_METRICS_LISTENER`: The Logz.io listener URL
 - `LOGZIO_METRICS_TOKEN`: The Logz.io token
+- `P8S_LOGZIO_NAME`: The environment identifier
 
 ### Minimum AWS IAM Permissions Required
 For the AWS Lambda function to be able to collect CloudWatch metrics and list S3 buckets, it will need the following permissions:
