@@ -243,6 +243,7 @@ Resources:
           METRIC_STREAM_ROLE_ARN: !GetAtt logzioMetricStreamRole.Arn
           STACK_NAME: !Ref AWS::StackName
           DEBUG_MODE: !Ref debugMode
+          P8S_LOGZIO_NAME: !Ref p8sLogzioName
   logzioNamespacesPrimerInvoke:
     Type: AWS::CloudFormation::CustomResource
     Condition: AtLeastOneNamespaceDefined
