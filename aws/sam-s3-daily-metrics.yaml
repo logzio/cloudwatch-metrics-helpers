@@ -4,11 +4,15 @@ Description: "Send Cloudwatch metrics from your CloudWatch to Logz.io"
 Parameters:
   logzioToken:
     Type: String
-    Description: 'Your Logz.io log shipping token'
+    Description: 'Your Logz.io metrics shipping token'
     MinLength: 1
   logzioListener:
     Type: String
     Description: 'Your Logz.io listener'
+  p8sLogzioName:
+    Type: String
+    Description: '`p8s_logzio_name` is a custom label added to all metrics from this integration.'
+    Default: 'logzio-otlp-metrics-stream'
 Resources:
   logzioS3MetricsLambda:
     Type: 'AWS::Lambda::Function'
@@ -26,6 +30,7 @@ Resources:
         Variables:
           LOGZIO_METRICS_LISTENER: !Ref logzioListener
           LOGZIO_METRICS_TOKEN: !Ref logzioToken
+          P8S_LOGZIO_NAME: !Ref p8sLogzioName
   logzioS3MetricsLambdaRole:
     Type: 'AWS::IAM::Role'
     Properties:

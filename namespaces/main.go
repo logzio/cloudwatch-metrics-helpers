@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"strings"
+
 	"github.com/aws/aws-lambda-go/cfn"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"log"
-	"os"
-	"strings"
 )
 
 const (
@@ -22,16 +23,19 @@ const (
 	envFirehoseArn     = "FIREHOSE_ARN"
 	envRoleArn         = "METRIC_STREAM_ROLE_ARN"
 	envDebugMode       = "DEBUG_MODE"
+	envP8slogzioName   = "P8S_LOGZIO_NAME"
 
 	emptyString   = ""
 	listSeparator = ","
 
 	paramLogzioMetricsListener = "logzioListener"
 	paramLogzioMetricsToken    = "logzioToken"
+	paramP8slogzioName         = "p8sLogzioName"
 	envLogzioMetricsListener   = "LOGZIO_METRICS_LISTENER"
 	envLogzioMetricsToken      = "LOGZIO_METRICS_TOKEN"
 	envStackName               = "STACK_NAME"
 	version                    = "latest"
+	defualtP8sLogzioName       = "cloudwatch-helpers"
 )
 
 var logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
@@ -114,7 +118,7 @@ func run() error {
 
 	debugLog("Preparing to create CloudWatch metric stream with name: %s", streamName)
 
-	outputFormat := "opentelemetry0.7"
+	outputFormat := "opentelemetry1.0"
 	filters := make([]*cloudwatch.MetricStreamFilter, 0)
 	for _, namespace := range awsNs {
 		filter := &cloudwatch.MetricStreamFilter{Namespace: aws.String(namespace)}
@@ -167,6 +171,10 @@ func run() error {
 			{
 				ParameterKey:   aws.String(paramLogzioMetricsToken),
 				ParameterValue: aws.String(token),
+			},
+			{
+				ParameterKey:   aws.String(paramP8slogzioName),
+				ParameterValue: aws.String(getP8sLogzioName()),
 			},
 		}
 		stackName := fmt.Sprintf("%v-s3", currentStack)
@@ -260,6 +268,15 @@ func getLogzioToken() (string, error) {
 	}
 
 	return listener, nil
+}
+
+func getP8sLogzioName() string {
+	envTag := os.Getenv(envP8slogzioName)
+	if envTag == "" {
+		return defualtP8sLogzioName
+	}
+
+	return envTag
 }
 
 // getStackName gets the name of the cfn stack from environment variables

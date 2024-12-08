@@ -5,13 +5,13 @@ Parameters:
   logzioDestination:
     Type: String
     Description: 'Your Logz.io destination'
-    Default: 'https://listener-aws-metrics-stream-us.logz.io/'
+    Default: 'https://listener-otlp-aws-metrics-stream-us.logz.io'
     AllowedValues:
-      - 'https://listener-aws-metrics-stream-us.logz.io/'
-      - 'https://listener-aws-metrics-stream-eu.logz.io/'
-      - 'https://listener-aws-metrics-stream-au.logz.io/'
-      - 'https://listener-aws-metrics-stream-uk.logz.io/'
-      - 'https://listener-aws-metrics-stream-ca.logz.io/'
+      - 'https://listener-otlp-aws-metrics-stream-us.logz.io'
+      - 'https://listener-otlp-aws-metrics-stream-eu.logz.io'
+      - 'https://listener-otlp-aws-metrics-stream-au.logz.io'
+      - 'https://listener-otlp-aws-metrics-stream-uk.logz.io'
+      - 'https://listener-otlp-aws-metrics-stream-ca.logz.io'
   logzioToken:
     Type: String
     Description: 'Your Logz.io log shipping token'
@@ -47,6 +47,10 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
+  p8sLogzioName:
+    Type: String
+    Description: '`p8s_logzio_name` is a custom label added to all metrics from this integration.'
+    Default: 'logzio-otlp-metrics-stream'
 Conditions:
   AtLeastOneNamespaceDefined: !Or
     - !Not [!Equals [!Ref awsNamespaces, ""]]
@@ -169,6 +173,10 @@ Resources:
           Enabled: true
           LogGroupName: !Ref logzioFirehoseLogGroup
           LogStreamName: !Ref logzioLogStream
+        RequestConfiguration:
+          CommonAttributes:
+            - AttributeName: 'P8S_LOGZIO_NAME'
+              AttributeValue: !Ref p8sLogzioName
 
   logzioMetricStreamRole:
     Type: 'AWS::IAM::Role'
@@ -207,7 +215,7 @@ Resources:
     Properties:
       FirehoseArn: !GetAtt logzioDeliveryStream.Arn
       Name: !Join ['-', ['LogzioMetricStream', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
-      OutputFormat: 'opentelemetry0.7'
+      OutputFormat: opentelemetry1.0
       RoleArn: !GetAtt logzioMetricStreamRole.Arn
   logzioMetricStreamAddNamespacesLambda:
     Type: 'AWS::Lambda::Function'
@@ -235,6 +243,7 @@ Resources:
           METRIC_STREAM_ROLE_ARN: !GetAtt logzioMetricStreamRole.Arn
           STACK_NAME: !Ref AWS::StackName
           DEBUG_MODE: !Ref debugMode
+          P8S_LOGZIO_NAME: !Ref p8sLogzioName
   logzioNamespacesPrimerInvoke:
     Type: AWS::CloudFormation::CustomResource
     Condition: AtLeastOneNamespaceDefined
