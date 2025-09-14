@@ -9,21 +9,24 @@ import (
 
 	"github.com/aws/aws-lambda-go/cfn"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudformation"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
 
 const (
-	envAwsRegion       = "AWS_REGION" // reserved env
-	envAwsNamespaces   = "AWS_NAMESPACES"
-	envCustomNamespace = "CUSTOM_NAMESPACE"
-	envStreamName      = "METRIC_STREAM_NAME"
-	envFirehoseArn     = "FIREHOSE_ARN"
-	envRoleArn         = "METRIC_STREAM_ROLE_ARN"
-	envDebugMode       = "DEBUG_MODE"
-	envP8slogzioName   = "P8S_LOGZIO_NAME"
+	envAwsRegion             = "AWS_REGION" // reserved env
+	envAwsNamespaces         = "AWS_NAMESPACES"
+	envCustomNamespace       = "CUSTOM_NAMESPACE"
+	envIncludeMetricsFilters = "INCLUDE_METRICS_FILTERS"
+	envStreamName            = "METRIC_STREAM_NAME"
+	envFirehoseArn           = "FIREHOSE_ARN"
+	envRoleArn               = "METRIC_STREAM_ROLE_ARN"
+	envDebugMode             = "DEBUG_MODE"
+	envP8slogzioName         = "P8S_LOGZIO_NAME"
 
 	emptyString   = ""
 	listSeparator = ","
@@ -44,6 +47,121 @@ func debugLog(format string, v ...interface{}) {
 	if strings.ToLower(os.Getenv(envDebugMode)) == "true" {
 		logger.Printf(format, v...)
 	}
+}
+
+// parseIncludeMetricsFilters parses comma-separated namespace:metric pairs with robust error handling
+// Example: "AWS/EC2:CPUUtilization,AWS/EC2:NetworkIn,AWS/S3:BucketSizeBytes"
+// Returns: (map[namespace][]metrics, warnings)
+func parseIncludeMetricsFilters(input string) (map[string][]string, []string) {
+	result := make(map[string][]string)
+	var warnings []string
+
+	if strings.TrimSpace(input) == "" {
+		return result, warnings
+	}
+
+	pairs := strings.Split(input, listSeparator)
+	for _, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+
+		parts := strings.Split(pair, ":")
+		if len(parts) != 2 {
+			warnings = append(warnings, fmt.Sprintf("invalid format '%s', expected 'namespace:metric' - skipping", pair))
+			continue
+		}
+
+		namespace := strings.TrimSpace(parts[0])
+		metric := strings.TrimSpace(parts[1])
+
+		if namespace == "" || metric == "" {
+			warnings = append(warnings, fmt.Sprintf("empty namespace or metric in '%s' - skipping", pair))
+			continue
+		}
+
+		if !isValidASCII(namespace) || !isValidASCII(metric) {
+			warnings = append(warnings, fmt.Sprintf("invalid characters in '%s' - skipping", pair))
+			continue
+		}
+
+		found := false
+		for _, existing := range result[namespace] {
+			if existing == metric {
+				found = true
+				break
+			}
+		}
+		if !found {
+			result[namespace] = append(result[namespace], metric)
+		}
+	}
+
+	return result, warnings
+}
+
+// isValidASCII checks if string contains only ASCII printable characters (32-126)
+func isValidASCII(s string) bool {
+	for _, r := range s {
+		if r < 32 || r > 126 {
+			return false
+		}
+	}
+	return true
+}
+
+// buildIncludeFilters creates IncludeFilters from namespaces and optional metric filters
+// Applies 1000-name limit gracefully
+func buildIncludeFilters(namespaces []string, includeMap map[string][]string) ([]cwtypes.MetricStreamFilter, []string) {
+	filters := make([]cwtypes.MetricStreamFilter, 0, len(namespaces))
+	var warnings []string
+
+	totalNames := len(namespaces)
+	for _, metrics := range includeMap {
+		totalNames += len(metrics)
+	}
+
+	remainingBudget := 1000 - len(namespaces)
+	if remainingBudget < 0 {
+		remainingBudget = 0
+	}
+
+	if totalNames > 1000 {
+		warnings = append(warnings, fmt.Sprintf("total filter names (%d) exceeds CloudWatch limit (1000), some metric names will be dropped", totalNames))
+	}
+
+	for _, ns := range namespaces {
+		if metrics, ok := includeMap[ns]; ok && len(metrics) > 0 {
+			metricsToInclude := metrics
+			if len(metrics) > remainingBudget {
+				metricsToInclude = metrics[:remainingBudget]
+				if remainingBudget > 0 {
+					warnings = append(warnings, fmt.Sprintf("dropped %d metric names from namespace %s due to 1000-name limit", len(metrics)-remainingBudget, ns))
+				}
+				remainingBudget = 0
+			} else {
+				remainingBudget -= len(metrics)
+			}
+
+			if len(metricsToInclude) > 0 {
+				filters = append(filters, cwtypes.MetricStreamFilter{
+					Namespace:   aws.String(ns),
+					MetricNames: metricsToInclude,
+				})
+			} else {
+				filters = append(filters, cwtypes.MetricStreamFilter{
+					Namespace: aws.String(ns),
+				})
+			}
+		} else {
+			filters = append(filters, cwtypes.MetricStreamFilter{
+				Namespace: aws.String(ns),
+			})
+		}
+	}
+
+	return filters, warnings
 }
 
 func generatePhysicalResourceId(event cfn.Event) string {
@@ -103,7 +221,7 @@ func run() error {
 		return err
 	}
 
-	sess, sessErr := getSession()
+	cfg, sessErr := getSession()
 	if sessErr != nil {
 		logger.Printf("Failed to create AWS session: %s", sessErr.Error())
 		return sessErr
@@ -111,46 +229,74 @@ func run() error {
 
 	debugLog("AWS session created successfully. AWS Namespaces to include: %v", awsNs)
 
-	client := cloudwatch.New(sess)
+	client := cloudwatch.NewFromConfig(*cfg)
 	streamName := os.Getenv(envStreamName)
 	firehoseArn := os.Getenv(envFirehoseArn)
 	roleArn := os.Getenv(envRoleArn)
 
 	debugLog("Preparing to create CloudWatch metric stream with name: %s", streamName)
 
-	outputFormat := "opentelemetry1.0"
-	filters := make([]*cloudwatch.MetricStreamFilter, 0)
-	for _, namespace := range awsNs {
-		filter := &cloudwatch.MetricStreamFilter{Namespace: aws.String(namespace)}
-		filters = append(filters, filter)
-		if namespace == nsS3 {
-			DeployS3Function = true
+	includeMetricsInput := os.Getenv(envIncludeMetricsFilters)
+	includeMap, parseWarnings := parseIncludeMetricsFilters(includeMetricsInput)
+
+	for _, warning := range parseWarnings {
+		logger.Printf("Warning: %s", warning)
+	}
+
+	filteredIncludeMap := make(map[string][]string)
+	namespaceSet := make(map[string]bool)
+	for _, ns := range awsNs {
+		namespaceSet[ns] = true
+	}
+
+	for ns, metrics := range includeMap {
+		if namespaceSet[ns] {
+			filteredIncludeMap[ns] = metrics
+		} else {
+			logger.Printf("Warning: ignoring metrics for namespace '%s' not in AWS_NAMESPACES", ns)
 		}
 	}
 
-	logger.Printf("Filters prepared: %+v", filters)
+	outputFormat := cwtypes.MetricStreamOutputFormat("opentelemetry1.0")
 
-	putFilterOutput, err := client.PutMetricStream(&cloudwatch.PutMetricStreamInput{
-		FirehoseArn:    &firehoseArn,
-		IncludeFilters: filters,
-		Name:           &streamName,
-		OutputFormat:   &outputFormat,
-		RoleArn:        &roleArn,
-	})
+	for _, namespace := range awsNs {
+		if namespace == nsS3 {
+			DeployS3Function = true
+			break
+		}
+	}
 
+	includeFilters, filterWarnings := buildIncludeFilters(awsNs, filteredIncludeMap)
+
+	for _, warning := range filterWarnings {
+		logger.Printf("Warning: %s", warning)
+	}
+
+	debugLog("Using include filters for namespaces: %v with metric filters: %v", awsNs, filteredIncludeMap)
+
+	input := &cloudwatch.PutMetricStreamInput{
+		FirehoseArn:    aws.String(firehoseArn),
+		Name:           aws.String(streamName),
+		OutputFormat:   outputFormat,
+		RoleArn:        aws.String(roleArn),
+		IncludeFilters: includeFilters,
+	}
+
+	logger.Printf("Filters prepared: Include=%d", len(input.IncludeFilters))
+
+	putFilterOutput, err := client.PutMetricStream(context.TODO(), input)
 	if err != nil {
 		logger.Printf("Failed to create/update CloudWatch metric stream: %s", err.Error())
 		return err
 	}
 
 	debugLog("CloudWatch metric stream created/updated successfully")
-
-	logger.Println(putFilterOutput.String())
+	logger.Printf("Metric stream ARN: %s", aws.ToString(putFilterOutput.Arn))
 
 	// deploy s3 function if needed
 	if DeployS3Function {
 		log.Printf("Deploying S3 function")
-		cloudformationClient := cloudformation.New(sess)
+		cloudformationClient := cloudformation.NewFromConfig(*cfg)
 		listener, getListenerErr := getListener()
 		if getListenerErr != nil {
 			return fmt.Errorf("error while getting logzio listener address: %s", getListenerErr.Error())
@@ -163,7 +309,7 @@ func run() error {
 		if stackErr != nil {
 			return fmt.Errorf("error while getting stack name: %s", stackErr.Error())
 		}
-		params := []*cloudformation.Parameter{
+		params := []cftypes.Parameter{
 			{
 				ParameterKey:   aws.String(paramLogzioMetricsListener),
 				ParameterValue: aws.String(listener),
@@ -180,14 +326,14 @@ func run() error {
 		stackName := fmt.Sprintf("%v-s3", currentStack)
 		templateUrl := fmt.Sprintf("https://logzio-aws-integrations-%v.s3.amazonaws.com/metric-stream-helpers/aws/%v/sam-s3-daily-metrics.yaml", os.Getenv(envAwsRegion), version)
 		// Create a new CloudFormation stack
-		_, cfErr := cloudformationClient.CreateStack(&cloudformation.CreateStackInput{
+		_, cfErr := cloudformationClient.CreateStack(context.TODO(), &cloudformation.CreateStackInput{
 			StackName:   aws.String(stackName),
 			TemplateURL: aws.String(templateUrl),
 			Parameters:  params,
-			Capabilities: []*string{
-				aws.String(cloudformation.CapabilityCapabilityAutoExpand),
-				aws.String(cloudformation.CapabilityCapabilityIam),
-				aws.String(cloudformation.CapabilityCapabilityNamedIam),
+			Capabilities: []cftypes.Capability{
+				cftypes.CapabilityCapabilityAutoExpand,
+				cftypes.CapabilityCapabilityIam,
+				cftypes.CapabilityCapabilityNamedIam,
 			},
 		})
 		if cfErr != nil {
@@ -199,18 +345,13 @@ func run() error {
 	return nil
 }
 
-func getSession() (*session.Session, error) {
-	sess, err := session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{
-			Region: aws.String(os.Getenv(envAwsRegion)),
-		},
-	})
-
+func getSession() (*aws.Config, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(os.Getenv(envAwsRegion)))
 	if err != nil {
 		return nil, fmt.Errorf("error occurred while trying to create a connection to aws: %s. Aborting", err.Error())
 	}
 
-	return sess, nil
+	return &cfg, nil
 }
 
 func getAwsNamespaces() ([]string, error) {

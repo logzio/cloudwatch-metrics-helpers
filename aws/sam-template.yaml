@@ -32,6 +32,10 @@ Parameters:
   customNamespace:
     Type: String
     Description: 'A custom namespace for CloudWatch metrics'
+  includeMetricsFilters:
+    Type: String
+    Default: ''
+    Description: 'Comma-separated namespace:metric pairs to include (e.g., AWS/EC2:CPUUtilization,AWS/S3:BucketSizeBytes)'
   httpEndpointDestinationIntervalInSeconds:
     Type: Number
     Description: 'The length of time, in seconds, that Kinesis Data Firehose buffers incoming data before delivering it to the destination'
@@ -244,6 +248,7 @@ Resources:
           STACK_NAME: !Ref AWS::StackName
           DEBUG_MODE: !Ref debugMode
           P8S_LOGZIO_NAME: !Ref p8sLogzioName
+          INCLUDE_METRICS_FILTERS: !Ref includeMetricsFilters
   logzioNamespacesPrimerInvoke:
     Type: AWS::CloudFormation::CustomResource
     Condition: AtLeastOneNamespaceDefined
