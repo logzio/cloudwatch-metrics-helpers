@@ -98,7 +98,6 @@ func customResourceHandler(ctx context.Context, event cfn.Event) (physicalResour
 func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 	fmt.Println("Starting s3DailyMetricsHandler")
 
-	// Configure metrics exporter and meter provider
 	meterProvider, err := configureMetricsExporter(ctx)
 	if err != nil {
 		return "", err
@@ -109,11 +108,9 @@ func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 		handleErr(meterProvider.Shutdown(shutdownCtx))
 	}()
 
-	// Set global meter provider
 	otel.SetMeterProvider(meterProvider)
 	meter := otel.Meter("aws_s3")
 
-	// Create a new AWS session
 	fmt.Println("Creating new AWS session")
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
 	if err != nil {
@@ -121,30 +118,24 @@ func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 		return err.Error(), err
 	}
 
-	// Create a new CloudWatch client
 	fmt.Println("Creating new CloudWatch client")
 	cw := cloudwatch.NewFromConfig(cfg)
 
-	// Create a new S3 client
 	fmt.Println("Creating new S3 client")
 	s3Client := s3.NewFromConfig(cfg)
 
-	// List all the buckets in the S3 namespace
 	fmt.Println("Listing all the buckets in the S3 namespace")
 	buckets, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	if err != nil {
 		return err.Error(), err
 	}
 
-	// Iterate through the buckets and get the NumberOfObjects and BucketSizeBytes metrics for each bucket
 	fmt.Println("Iterating through the buckets and get the NumberOfObjects and BucketSizeBytes metrics for each bucket")
 	for _, bucket := range buckets.Buckets {
-		// Get the NumberOfObjects metric for the bucket
 		NumberOfObjectsErr := collectCloudwatchMetric(metricNameNumObjects, unitCount, storageTypeAll, bucket, ctx, meter, cw)
 		if NumberOfObjectsErr != nil {
 			fmt.Printf("Error while collecting NumberOfObjects metric for bucket %s: %s", *bucket.Name, NumberOfObjectsErr.Error())
 		}
-		// Get the BucketSizeBytes metric for the bucket
 		BucketSizeBytesErr := collectCloudwatchMetric(metricNameSizeBytes, unitBytes, storageTypeStandard, bucket, ctx, meter, cw)
 		if BucketSizeBytesErr != nil {
 			fmt.Printf("Error while collecting BucketSizeBytes metric for bucket %s: %s", *bucket.Name, BucketSizeBytesErr.Error())
@@ -159,7 +150,6 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 	var err error
 	var backoff = 1
 
-	// retry logic
 	for i := 0; i < 3; i++ {
 		cloudwatchMetric, err = cw.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
 			MetricDataQueries: []types.MetricDataQuery{
@@ -186,15 +176,12 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 					},
 				},
 			},
-			// Set the start time to 2 day ago
 			StartTime: aws.Time(time.Now().Add(-48 * time.Hour)),
 			EndTime:   aws.Time(time.Now()),
 		})
-		// No error, break out of the loop
 		if err == nil {
 			break
 		}
-		// Check for 4XX errors and cancel the retry if we encounter one
 		if strings.Contains(err.Error(), "403") {
 			fmt.Printf("Received 403 error, Retry aborted. Error: %s", err.Error())
 			break
@@ -207,9 +194,7 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 			fmt.Printf("Received 400 error, Retry aborted. Error: %s", err.Error())
 			break
 		}
-		// Handle non 4XX errors with retry logic
 		fmt.Printf("Error while performing GetMetricData api call for bucket %s. Trying again in %v seconds. Error: %s", *bucket.Name, backoff, err.Error())
-		// wait before retrying (exponential backoff)
 		time.Sleep(time.Duration(backoff) * time.Second)
 		backoff = backoff * 2
 	}
@@ -237,7 +222,6 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 
 			metricValue := int64(cloudwatchMetric.MetricDataResults[0].Values[0])
 
-			// Create counter instrument with new API
 			counter, err := meter.Int64UpDownCounter("aws_s3_" + strings.ToLower(name) + "_max")
 			if err != nil {
 				return fmt.Errorf("failed to create counter: %w", err)
