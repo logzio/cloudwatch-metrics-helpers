@@ -112,7 +112,7 @@ func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 	meter := otel.Meter("aws_s3")
 
 	fmt.Println("Creating new AWS session")
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(os.Getenv("AWS_REGION")))
 	if err != nil {
 		fmt.Printf(err.Error())
 		return err.Error(), err

@@ -27,6 +27,8 @@ const (
 	envRoleArn               = "METRIC_STREAM_ROLE_ARN"
 	envDebugMode             = "DEBUG_MODE"
 	envP8slogzioName         = "P8S_LOGZIO_NAME"
+	nameCountLimit           = 1000
+	otlpVersion              = "opentelemetry1.0"
 
 	emptyString   = ""
 	listSeparator = ","
@@ -122,12 +124,12 @@ func buildIncludeFilters(namespaces []string, includeMap map[string][]string) ([
 		totalNames += len(metrics)
 	}
 
-	remainingBudget := 1000 - len(namespaces)
+	remainingBudget := nameCountLimit - len(namespaces)
 	if remainingBudget < 0 {
 		remainingBudget = 0
 	}
 
-	if totalNames > 1000 {
+	if totalNames > nameCountLimit {
 		warnings = append(warnings, fmt.Sprintf("total filter names (%d) exceeds CloudWatch limit (1000), some metric names will be dropped", totalNames))
 	}
 
