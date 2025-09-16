@@ -259,7 +259,7 @@ func run() error {
 		}
 	}
 
-	outputFormat := cwtypes.MetricStreamOutputFormat("opentelemetry1.0")
+	outputFormat := cwtypes.MetricStreamOutputFormat(otlpVersion)
 
 	for _, namespace := range awsNs {
 		if namespace == nsS3 {
