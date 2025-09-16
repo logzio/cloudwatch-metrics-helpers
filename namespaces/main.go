@@ -223,7 +223,7 @@ func run() error {
 		return err
 	}
 
-	cfg, sessErr := getSession()
+	cfg, sessErr := getConfig()
 	if sessErr != nil {
 		logger.Printf("Failed to create AWS session: %s", sessErr.Error())
 		return sessErr
@@ -347,7 +347,7 @@ func run() error {
 	return nil
 }
 
-func getSession() (*aws.Config, error) {
+func getConfig() (*aws.Config, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(os.Getenv(envAwsRegion)))
 	if err != nil {
 		return nil, fmt.Errorf("error occurred while trying to create a connection to aws: %s. Aborting", err.Error())

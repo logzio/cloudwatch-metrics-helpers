@@ -98,7 +98,7 @@ func customResourceHandler(ctx context.Context, event cfn.Event) (physicalResour
 func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 	fmt.Println("Starting s3DailyMetricsHandler")
 
-	meterProvider, err := configureMetricsExporter(ctx)
+	meterProvider, err := configureMeterProvider(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -233,8 +233,8 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 	return nil
 }
 
-// configureMetricsExporter Configures the Logz.io metrics exporter
-func configureMetricsExporter(ctx context.Context) (*sdkmetric.MeterProvider, error) {
+// configureMeterProvider Configures the Logz.io meter provider
+func configureMeterProvider(ctx context.Context) (*sdkmetric.MeterProvider, error) {
 	listener, err := getListener()
 	if err != nil {
 		return nil, fmt.Errorf("error while configuring metrics exporter: %s", err.Error())
