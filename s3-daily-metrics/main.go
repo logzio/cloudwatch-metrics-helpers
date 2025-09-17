@@ -9,14 +9,17 @@ import (
 
 	"github.com/aws/aws-lambda-go/cfn"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/aws/aws-sdk-go/service/s3"
-	metricsExporter "github.com/logzio/go-metrics-sdk"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	metricsExporter "github.com/logzio/go-metrics-sdk/v2"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/sdk/metric/controller/basic"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 )
 
 const (
@@ -94,42 +97,46 @@ func customResourceHandler(ctx context.Context, event cfn.Event) (physicalResour
 // s3DailyMetricsHandler Handles the scheduled invocation
 func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 	fmt.Println("Starting s3DailyMetricsHandler")
-	exporter, err := configureMetricsExporter()
+
+	meterProvider, err := configureMeterProvider(ctx)
 	if err != nil {
 		return "", err
 	}
 	defer func() {
-		handleErr(exporter.Stop(ctx))
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		handleErr(meterProvider.Shutdown(shutdownCtx))
 	}()
-	meter := exporter.Meter("aws_s3")
-	// Create a new AWS session
+
+	otel.SetMeterProvider(meterProvider)
+	meter := otel.Meter("aws_s3")
+
 	fmt.Println("Creating new AWS session")
-	sess, err := session.NewSession(&aws.Config{Region: aws.String("us-east-1")})
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(os.Getenv("AWS_REGION")))
 	if err != nil {
 		fmt.Printf(err.Error())
+		return err.Error(), err
 	}
-	// Create a new CloudWatch client
+
 	fmt.Println("Creating new CloudWatch client")
-	cw := cloudwatch.New(sess)
-	// Create a new S3 client
+	cw := cloudwatch.NewFromConfig(cfg)
+
 	fmt.Println("Creating new S3 client")
-	s3Client := s3.New(sess)
-	// List all the buckets in the S3 namespace
+	s3Client := s3.NewFromConfig(cfg)
+
 	fmt.Println("Listing all the buckets in the S3 namespace")
-	buckets, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
+	buckets, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	if err != nil {
 		return err.Error(), err
 	}
-	// Iterate through the buckets and get the NumberOfObjects and BucketSizeBytes metrics for each bucket
+
 	fmt.Println("Iterating through the buckets and get the NumberOfObjects and BucketSizeBytes metrics for each bucket")
 	for _, bucket := range buckets.Buckets {
-		// Get the NumberOfObjects metric for the bucket
-		NumberOfObjectsErr := collectCloudwatchMetric(metricNameNumObjects, unitCount, storageTypeAll, bucket, ctx, &meter, cw)
+		NumberOfObjectsErr := collectCloudwatchMetric(metricNameNumObjects, unitCount, storageTypeAll, bucket, ctx, meter, cw)
 		if NumberOfObjectsErr != nil {
 			fmt.Printf("Error while collecting NumberOfObjects metric for bucket %s: %s", *bucket.Name, NumberOfObjectsErr.Error())
 		}
-		// Get the BucketSizeBytes metric for the bucket
-		BucketSizeBytesErr := collectCloudwatchMetric(metricNameSizeBytes, unitBytes, storageTypeStandard, bucket, ctx, &meter, cw)
+		BucketSizeBytesErr := collectCloudwatchMetric(metricNameSizeBytes, unitBytes, storageTypeStandard, bucket, ctx, meter, cw)
 		if BucketSizeBytesErr != nil {
 			fmt.Printf("Error while collecting BucketSizeBytes metric for bucket %s: %s", *bucket.Name, BucketSizeBytesErr.Error())
 		}
@@ -138,21 +145,21 @@ func s3DailyMetricsHandler(ctx context.Context) (string, error) {
 }
 
 // collectCloudwatchMetric Collects a Cloudwatch metric for a given bucket and metric name
-func collectCloudwatchMetric(name string, unit string, storageType string, bucket *s3.Bucket, ctx context.Context, meter *metric.Meter, cw *cloudwatch.CloudWatch) error {
+func collectCloudwatchMetric(name string, unit string, storageType string, bucket s3types.Bucket, ctx context.Context, meter metric.Meter, cw *cloudwatch.Client) error {
 	var cloudwatchMetric *cloudwatch.GetMetricDataOutput
 	var err error
 	var backoff = 1
-	// retry logic
+
 	for i := 0; i < 3; i++ {
-		cloudwatchMetric, err = cw.GetMetricData(&cloudwatch.GetMetricDataInput{
-			MetricDataQueries: []*cloudwatch.MetricDataQuery{
+		cloudwatchMetric, err = cw.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
+			MetricDataQueries: []types.MetricDataQuery{
 				{
 					Id: aws.String("m1"),
-					MetricStat: &cloudwatch.MetricStat{
-						Metric: &cloudwatch.Metric{
+					MetricStat: &types.MetricStat{
+						Metric: &types.Metric{
 							Namespace:  aws.String("AWS/S3"),
 							MetricName: aws.String(name),
-							Dimensions: []*cloudwatch.Dimension{
+							Dimensions: []types.Dimension{
 								{
 									Name:  aws.String("BucketName"),
 									Value: aws.String(*bucket.Name),
@@ -163,21 +170,18 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 								},
 							},
 						},
-						Period: aws.Int64(86400),
+						Period: aws.Int32(86400),
 						Stat:   aws.String("Maximum"),
-						Unit:   aws.String(unit),
+						Unit:   types.StandardUnit(unit),
 					},
 				},
 			},
-			// Set the start time to 2 day ago
 			StartTime: aws.Time(time.Now().Add(-48 * time.Hour)),
 			EndTime:   aws.Time(time.Now()),
 		})
-		// No error, break out of the loop
 		if err == nil {
 			break
 		}
-		// Check for 4XX errors and cancel the retry if we encounter one
 		if strings.Contains(err.Error(), "403") {
 			fmt.Printf("Received 403 error, Retry aborted. Error: %s", err.Error())
 			break
@@ -190,9 +194,7 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 			fmt.Printf("Received 400 error, Retry aborted. Error: %s", err.Error())
 			break
 		}
-		// Handle non 4XX errors with retry logic
 		fmt.Printf("Error while performing GetMetricData api call for bucket %s. Trying again in %v seconds. Error: %s", *bucket.Name, backoff, err.Error())
-		// wait before retrying (exponential backoff)
 		time.Sleep(time.Duration(backoff) * time.Second)
 		backoff = backoff * 2
 	}
@@ -203,48 +205,36 @@ func collectCloudwatchMetric(name string, unit string, storageType string, bucke
 	if len(cloudwatchMetric.MetricDataResults) > 0 {
 		if len(cloudwatchMetric.MetricDataResults[0].Values) > 0 {
 			// Attributes for the metric
-			attributes := make([]attribute.KeyValue, 0)
-			// Add the bucket name as an attribute
-			attributes = append(attributes, attribute.KeyValue{
-				Key:   fieldBucketName,
-				Value: attribute.StringValue(*bucket.Name),
-			})
-			// Add logzio_agent_version as an attribute
-			attributes = append(attributes, attribute.KeyValue{
-				Key:   fieldLogzioAgentVersion,
-				Value: attribute.StringValue(fieldLogzioAgentVersionValue),
-			})
-			// Add namespace attribute
-			attributes = append(attributes, attribute.KeyValue{
-				Key:   fieldNameSpace,
-				Value: attribute.StringValue(fieldNameSpaceValue),
-			})
-			// Add p8s_logzio_name attribute
-			envTag := getEnvTag()
-			attributes = append(attributes, attribute.KeyValue{
-				Key:   fieldP8slogzioName,
-				Value: attribute.StringValue(envTag),
-			})
-			// Add aws region attribute
-			attributes = append(attributes, attribute.KeyValue{
-				Key:   fieldRegion,
-				Value: attribute.StringValue(os.Getenv("AWS_REGION")),
-			})
-			// Add aws account attribute
-			attributes = append(attributes, attribute.KeyValue{
-				Key:   fieldAccount,
-				Value: attribute.StringValue(os.Getenv("AWS_ACCOUNT_ID")),
-			})
-			metricValue := int64(*cloudwatchMetric.MetricDataResults[0].Values[0])
-			prometheusCloudwatchMetric := metric.Must(*meter).NewInt64UpDownCounter("aws_s3_" + strings.ToLower(name) + "_max")
-			prometheusCloudwatchMetric.Add(ctx, metricValue, attributes...)
+			attributes := []attribute.KeyValue{
+				// Add the bucket name as an attribute
+				attribute.String(fieldBucketName, *bucket.Name),
+				// Add logzio_agent_version as an attribute
+				attribute.String(fieldLogzioAgentVersion, fieldLogzioAgentVersionValue),
+				// Add namespace attribute
+				attribute.String(fieldNameSpace, fieldNameSpaceValue),
+				// Add p8s_logzio_name attribute
+				attribute.String(fieldP8slogzioName, getEnvTag()),
+				// Add aws region attribute
+				attribute.String(fieldRegion, os.Getenv("AWS_REGION")),
+				// Add aws account attribute
+				attribute.String(fieldAccount, os.Getenv("AWS_ACCOUNT_ID")),
+			}
+
+			metricValue := int64(cloudwatchMetric.MetricDataResults[0].Values[0])
+
+			counter, err := meter.Int64UpDownCounter("aws_s3_" + strings.ToLower(name) + "_max")
+			if err != nil {
+				return fmt.Errorf("failed to create counter: %w", err)
+			}
+
+			counter.Add(ctx, metricValue, metric.WithAttributes(attributes...))
 		}
 	}
 	return nil
 }
 
-// configureMetricsExporter Configures the Logz.io metrics exporter
-func configureMetricsExporter() (*basic.Controller, error) {
+// configureMeterProvider Configures the Logz.io meter provider
+func configureMeterProvider(ctx context.Context) (*sdkmetric.MeterProvider, error) {
 	listener, err := getListener()
 	if err != nil {
 		return nil, fmt.Errorf("error while configuring metrics exporter: %s", err.Error())
@@ -262,11 +252,15 @@ func configureMetricsExporter() (*basic.Controller, error) {
 		PushInterval:          2 * time.Second,
 	}
 
-	exporter, err := metricsExporter.InstallNewPipeline(config, basic.WithCollectPeriod(2*time.Second))
+	exporter, err := metricsExporter.New(config)
 	if err != nil {
-		return nil, fmt.Errorf("error while configuring metrics exporter: %s", err.Error())
+		return nil, fmt.Errorf("error while creating metrics exporter: %s", err.Error())
 	}
-	return exporter, nil
+
+	reader := sdkmetric.NewPeriodicReader(exporter, sdkmetric.WithInterval(2*time.Second))
+	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+
+	return meterProvider, nil
 }
 
 // getListener Gets the listener from the environment variables
@@ -281,12 +275,12 @@ func getListener() (string, error) {
 
 // getLogzioToken Gets the Logz.io token from the environment variables
 func getLogzioToken() (string, error) {
-	listener := os.Getenv(envLogzioMetricsToken)
-	if listener == "" {
-		return "", fmt.Errorf("%s must be set", envLogzioMetricsListener)
+	token := os.Getenv(envLogzioMetricsToken)
+	if token == "" {
+		return "", fmt.Errorf("%s must be set", envLogzioMetricsToken)
 	}
 
-	return listener, nil
+	return token, nil
 }
 
 func getEnvTag() string {
