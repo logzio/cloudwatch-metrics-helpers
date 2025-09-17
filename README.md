@@ -65,6 +65,14 @@ Give your Cloudformation a few minutes to be created, and that's it!
 
 
 ## Changelog:
+- **1.5.0**
+  - Namespaces:
+    - Add `includeMetricsFilters` param to filter in spesific metric names
+    - Upgrade `aws-sdk-go` -> `aws-sdk-go/v2` 
+  - S3-daily-metrics:
+    - Upgrade `aws-sdk-go` -> `aws-sdk-go/v2` 
+    - Upgrade `github.com/logzio/go-metrics-sdk` -> `github.com/logzio/go-metrics-sdk/v2` 
+    - Upgrade otel sdk to `v1.35.0`
 - **1.4.0**
   - Added Support for otlp 1.0 protocol
   - Support adding custom 'p8s_logzio_name` label
