@@ -28,7 +28,7 @@ Parameters:
       - 'https://listener-uk.logz.io:8053'
   awsNamespaces:
     Type: String
-    Description: 'The AWS namespaces you want to collect metrics from'
+    Description: 'Comma-separated list of the AWS namespaces you want to collect metrics from (e.g., AWS/EC2,AWS/S3)'
   customNamespace:
     Type: String
     Description: 'A custom namespace for CloudWatch metrics'
